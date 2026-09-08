@@ -115,16 +115,26 @@ credentials enter any step context. Only after that check, the job installs the
 runner's `subversion` package noninteractively and without recommended packages;
 the credentials are still scoped solely to the following deploy step.
 
-Configure the protected GitHub environment `wordpress-org` with:
+The repository is configured with the protected GitHub environment
+`wordpress-org`. It allows only custom deployment tag policies matching the two
+production prefixes:
 
-- repository/environment variable `WPORG_USERNAME`;
-- environment secret `WPORG_PASSWORD`.
+- `v[0-9]*.[0-9]*.[0-9]*`;
+- `v-[0-9]*.[0-9]*.[0-9]*`.
+
+The deliberately broad GitHub glob policies are followed by the workflow's
+strict semantic parser, which rejects malformed tags and every prerelease before
+this production job can run. The credentials currently use repository scope:
+
+- repository variable `WPORG_USERNAME`;
+- repository secret `WPORG_PASSWORD`.
 
 The username and password are exposed only to the final deploy step. The
 deploy script passes the password to SVN through standard input, never through
-the command line. GitHub environment protection rules may require an approval
-before this production-only job starts. A no-op/idempotent SVN state needs no
-commit, while a conflicting existing tag remains a hard failure.
+the command line. The environment currently has no required reviewer or wait
+timer; repository maintainers may add those governance controls later without
+changing the workflow. A no-op/idempotent SVN state needs no commit, while a
+conflicting existing tag remains a hard failure.
 
 ## Supply-chain and rerun policy
 

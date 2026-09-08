@@ -91,7 +91,10 @@ noninteractively, with `--no-install-recommends`, immediately before release
 fixtures in both CI and tag-release workflows. The production WordPress.org job
 does the same after source/artifact verification and before its credentialed
 deploy step. No unrelated job installs Subversion. Local actionlint confirms
-the corrected workflow structure; a hosted post-fix run remains required.
+the corrected workflow structure. Post-fix hosted CI run
+[`34287085705`](https://github.com/hokoo/wp-site-options/actions/runs/34287085705)
+then passed all eight jobs, including `Release contracts` and `Release
+candidate`.
 
 A real accepted tag push is deliberately not part of local verification because
 it would create external state. The first hosted run must confirm:

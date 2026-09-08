@@ -1,6 +1,6 @@
 # Execution backlog: WP Site Options delivery
 
-Статус документа: утверждённый план декомпозирован; реализация не начата.  
+Статус документа: выполнение в процессе; E1-E4 и задачи T20-T23 завершены.
 Источник: [delivery-plan.md](./delivery-plan.md)  
 Дата: 2026-09-08
 
@@ -1064,7 +1064,7 @@ Verification:
 
 ### T23. Проверить Actions configuration и выполнить real SVN dry-run
 
-Status: todo
+Status: completed
 Goal: Подтвердить availability правильных GitHub contexts и реальный WordPress.org delta без commit.  
 Scope:
 
@@ -1115,7 +1115,7 @@ Verification:
 
 ### T24. Провести независимый QA эпика E5
 
-Status: waiting_dependency  
+Status: todo
 Goal: Независимо проверить tag parsing, publish boundaries, idempotency и real dry-run evidence.  
 Scope:
 
