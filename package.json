@@ -1,0 +1,14 @@
+{
+  "name": "wp-site-options-development",
+  "version": "1.2.2",
+  "private": true,
+  "description": "Browser test tooling for WP Site Options.",
+  "license": "GPL-2.0-or-later",
+  "scripts": {
+    "test:e2e": "playwright test --config=playwright.config.cjs",
+    "test:e2e:install": "playwright install chromium"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.59.0"
+  }
+}

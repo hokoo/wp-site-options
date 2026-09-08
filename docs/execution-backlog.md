@@ -545,7 +545,7 @@ Verification:
 
 ### T12. Добавить authenticated admin smoke
 
-Status: waiting_dependency  
+Status: in_progress
 Goal: Проверить критический пользовательский сценарий Settings → Reading в браузере.  
 Scope:
 

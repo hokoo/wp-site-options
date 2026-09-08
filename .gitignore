@@ -7,6 +7,9 @@
 /coverage/
 /dist/
 /local-dev/
+/node_modules/
+/playwright-report/
+/test-results/
 /vendor/
 
 *.log
