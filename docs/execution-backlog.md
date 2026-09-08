@@ -693,7 +693,7 @@ Verification:
 
 ### T15. Провести независимый QA эпика E3
 
-Status: in_progress
+Status: completed
 Goal: Проверить, что tests и CI доказывают contracts, а не только подтверждают текущую реализацию.  
 Scope:
 
@@ -737,7 +737,7 @@ Verification:
 
 ### T16. Реализовать build и strict ZIP validator
 
-Status: waiting_dependency  
+Status: in_progress
 Goal: Собирать installable ZIP из `plugin-dir/` и отвергать unsafe/несогласованный артефакт.  
 Scope:
 
