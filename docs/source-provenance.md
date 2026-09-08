@@ -5,8 +5,13 @@
 - Source working copy: `/mnt/d/WP/wp-site-options`
 - Repository URL: `https://plugins.svn.wordpress.org/wp-site-options`
 - Repository UUID: `b8457f37-d9ea-0310-8a92-e5e31aec5664`
-- Working-copy revision at import: `3283153`
-- Last plugin change: revision `1608075`, author `hokku`, 2017-03-05 14:04:20 +0400
+- Working-copy root base revision at import: `3283153`
+- Mixed-revision range reported by `svnversion`: `3283153:3283155`
+- Latest imported subtree change: `trunk/readme.txt` at revision `3283155`,
+  author `hokku`, 2025-04-28 11:29:59 +0400
+- The plugin root and `trunk/` directory nodes last changed at revision `1608075`;
+  that directory-level value does not include later descendant changes and is
+  therefore not used as the snapshot's latest-change claim.
 - SVN status at import: clean
 - Imported Git commit: `640615d`
 - `trunk/` destination: `plugin-dir/`
