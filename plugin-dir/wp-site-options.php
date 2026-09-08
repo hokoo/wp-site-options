@@ -3,7 +3,9 @@
 Plugin Name: Site Options
 Plugin URI: http://nebster.net/en/plugins/site-options/
 Description: Allow specify theme options
-Version: 1.2.1
+Version: 1.2.2
+Requires at least: 6.0
+Requires PHP: 7.4
 Author: Игорь Тронь
 Author URI: http://nebster.net
 Domain Path: /languages

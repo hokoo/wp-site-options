@@ -2,9 +2,10 @@
 Contributors: hokku
 Donate link: https://www.paypal.me/hokku
 Tags: options,site options,theme options,settings page,settings
-Requires at least: 4.0
+Requires at least: 6.0
+Requires PHP: 7.4
 Tested up to: 6.8
-Stable tag: trunc
+Stable tag: 1.2.2
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -85,6 +86,10 @@ Please, [read instructions](http://nebster.net/en/plugins/site-options/ "Site Op
 You can define custom fieldtype by special filter, if no one this types was detected, see inc/fields.php, filter 'wpto_echo_field'.
 
 == Changelog ==
+
+= 1.2.2 =
+* Establish a tested maintenance baseline for modern WordPress and PHP versions.
+* Add reproducible development, verification, and release delivery tooling.
 
 = 1.2.1 - 05/03/17 =
 * GALLERY field type henceforth return array instead string

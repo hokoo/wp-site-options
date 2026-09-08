@@ -121,7 +121,7 @@ Verification:
 
 ### T3. Нормализовать metadata для версии 1.2.2
 
-Status: waiting_dependency  
+Status: completed  
 Goal: Подготовить согласованный version contract будущего первого автоматизированного релиза.  
 Scope:
 
