@@ -215,7 +215,7 @@ Verification:
 
 ### T5. Создать базовый Docker Compose stack
 
-Status: waiting_dependency  
+Status: completed  
 Goal: Поднять изолированные `db`, `wordpress` и `wp-cli` с configurable PHP image/project/ports и безопасным хранением данных.  
 Scope:
 
@@ -404,13 +404,13 @@ Verification:
 
 ### T9. Создать Composer test/tooling harness
 
-Status: waiting_dependency  
+Status: in_progress  
 Goal: Зафиксировать воспроизводимые dev dependencies и команды PHP lint/unit/integration/coding checks.  
 Scope:
 
 - root `composer.json`/lock для test tooling;
 - PHPUnit/WordPress test bootstrap;
-- scripts для lint, test suites и локального WordPress Plugin Check preflight;
+- scripts для PHP lint и test suites;
 - separation dev tooling от production `plugin-dir/`.
 
 Out of Scope:
@@ -506,6 +506,7 @@ Scope:
 - fixture fields на Settings → Reading;
 - option save/read round trip;
 - minimum/latest WordPress/PHP profiles;
+- локальная команда WordPress Plugin Check и initial report;
 - installation/activation собранного кандидата, когда builder станет доступен.
 
 Out of Scope:
