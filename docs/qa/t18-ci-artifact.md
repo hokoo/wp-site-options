@@ -1,15 +1,14 @@
 # T18 CI release-candidate evidence
 
 Date: 2026-09-08
-Source commit: `302c75e8d4275ffdae775febc12a70a1819d0079`
+Source commit: `abeb47ee1b12cacfb8c188cb5e6945b0630b2f7a`
 Canonical plugin version: `1.2.2`
 
 ## Result
 
-Local and static verification pass. The final `Release candidate` job is wired
-after all four upstream job IDs, so its upload cannot run until all six existing
-quality gates succeed. A hosted seven-check run remains pending until these
-workflow changes are committed and pushed to `master`.
+Pass. Local/static verification and the hosted artifact-service path both
+succeeded. The final `Release candidate` job ran after all four upstream job
+IDs, so its upload occurred only after all six existing quality gates passed.
 
 ## Workflow contract
 
@@ -75,7 +74,7 @@ The workflow's build, validation, reproducibility, checksum, and fresh-copy
 verification path was reproduced locally. The temporary second build and
 download directory were created under `mktemp` and removed by an EXIT trap.
 
-Observed metadata:
+Observed metadata for the pre-commit local parity run:
 
 ```text
 version=1.2.2
@@ -87,10 +86,30 @@ Both strict validator runs passed, `cmp` proved both builds byte-identical,
 `sha256sum -c` passed for the candidate and fresh copy, the fresh ZIP matched
 the local candidate, and the strict validator passed again on that copy.
 
-## Remaining hosted proof
+An additional local build from the committed hosted source used epoch
+`1788885888` and produced inner ZIP SHA-256
+`43ab994fa0f085d31c22acc5846e4a4c6c095b244a6b9b544800c0e8832b9650`.
 
-After commit and push, the primary evidence is one non-draft GitHub Actions run
-with all seven named checks green, including `Release candidate`. That run must
-also show the unique two-file artifact, successful service re-download, and the
-validated summary outputs. Until then, hosted artifact-service behavior is not
-claimed as verified.
+## Hosted proof
+
+[GitHub Actions run 34252959685](https://github.com/hokoo/wp-site-options/actions/runs/34252959685)
+was a `push` to `master` at the source commit above. It completed with
+`success`; all seven named jobs passed, including `Release candidate`.
+
+The public jobs API reports successful completion of each release-candidate
+step in order: metadata derivation, double build/validation, upload, fresh-path
+guard, download by artifact ID, downloaded-candidate verification, and summary.
+The run exposes exactly one non-expired artifact:
+
+```text
+id=10066750684
+name=wp-site-options-candidate-abeb47ee1b12cacfb8c188cb5e6945b0630b2f7a-34252959685-1
+size=11959 bytes
+service_digest=sha256:c95fcf446b14cf915bebc4b12360f0cc266575a0da77904a6dfd0df45cc142b5
+expires=2026-12-07T16:45:02Z
+```
+
+The artifact-service digest identifies GitHub's wrapper and is intentionally
+distinct from the inner release-ZIP checksum. Direct external download remains
+part of independent E4 QA; T18 itself proves GitHub's same-job upload/download
+transport and fail-closed revalidation path.

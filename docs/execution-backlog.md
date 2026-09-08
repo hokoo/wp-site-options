@@ -832,7 +832,7 @@ Verification:
 
 ### T18. Подключить verified ZIP artifact к CI
 
-Status: in_progress
+Status: completed
 Goal: Создавать в CI ровно тот кандидат, который впоследствии используется release workflow.  
 Scope:
 
@@ -875,7 +875,7 @@ Verification:
 
 ### T19. Провести независимый QA эпика E4
 
-Status: waiting_dependency  
+Status: in_progress
 Goal: Независимо проверить installability, hygiene и reproducibility release artifact.  
 Scope:
 
