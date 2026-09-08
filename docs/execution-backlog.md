@@ -499,7 +499,7 @@ Verification:
 
 ### T11. Добавить WordPress integration tests
 
-Status: in_progress
+Status: completed
 Goal: Проверить plugin lifecycle, settings registration и persistence в реальном WordPress.  
 Scope:
 

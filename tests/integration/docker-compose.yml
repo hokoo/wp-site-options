@@ -1,0 +1,44 @@
+services:
+  db:
+    image: "${DB_IMAGE:-mariadb:10.11}"
+    init: true
+    environment:
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: wordpress
+      MARIADB_ROOT_PASSWORD: wordpress-root
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+    volumes:
+      - db-data:/var/lib/mysql
+
+  wp-cli:
+    image: "${WP_CLI_IMAGE:?Set WP_CLI_IMAGE for the integration profile}"
+    init: true
+    user: "0:0"
+    depends_on:
+      db:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        trap 'exit 0' TERM INT
+        while :; do sleep 3600; done
+    healthcheck:
+      test: ["CMD", "wp", "--allow-root", "--info"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+      start_period: 5s
+    working_dir: /var/www/html
+    volumes:
+      - wordpress-data:/var/www/html
+      - ../../:/srv/web:ro
+
+volumes:
+  db-data:
+  wordpress-data:
