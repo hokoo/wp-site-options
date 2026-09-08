@@ -1,5 +1,7 @@
 <?php
 	namespace wpto;
+	if ( ! defined( 'ABSPATH' ) ) exit;
+
 	class Theme_options{
 		var
 			$fields,

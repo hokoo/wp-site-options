@@ -1,1 +1,2 @@
-<?php// Silence is golden. Code is poetry.?>
+<?php
+// Silence is golden. Code is poetry.

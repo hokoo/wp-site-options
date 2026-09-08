@@ -80,6 +80,7 @@ final class BootstrapContractTest extends TestCase
             [
                 'wpto_getoption',
                 'wpto_menu_init',
+                'wpto_sanitize_options',
                 'wpto_setting_section_before',
                 'wpto_echo_attrs',
                 'wpto_echo_field',

@@ -18,8 +18,9 @@
 	
 	function wpto_echo_field( $data ) {
 		global $wpto;
+		ob_start();
 
-		$value = $wpto->options[ $data[ 'cat' ] ][ $data[ 'slug' ] ] ;
+		$value = isset( $wpto->options[ $data[ 'cat' ] ][ $data[ 'slug' ] ] ) ? $wpto->options[ $data[ 'cat' ] ][ $data[ 'slug' ] ] : '';
 		if ( $value == '' && isset( $wpto->fields[ $data[ 'cat' ] ][1][ $data[ 'slug' ] ][2]['default'] ) )
 			$value = $wpto->fields[ $data[ 'cat' ] ][1][ $data[ 'slug' ] ][2]['default'];
 		$type = $wpto->fields[ $data[ 'cat' ] ][1][ $data[ 'slug' ] ][ 0 ];
@@ -47,6 +48,9 @@
 		switch ( $type ) {
 			case 'email' : ;
 			case 'text' :
+				// phpcs:ignore WordPress.WP.I18n.NonSingularStringLiteralDomain -- The theme-derived domain is a legacy public contract.
+				$validation_message = apply_filters( 'wpto_setCustomValidity_text', __( 'Please, check', $wpto->text_domain ), $type );
+				$validation_script = 'setCustomValidity( ' . wp_json_encode( $validation_message ) . ' )';
 			?>
 				<input 
 					name="<?php echo esc_attr( $data[ 'name' ] ) ?>" 
@@ -54,7 +58,7 @@
 					value="<?php echo esc_attr( $value ) ?>" 
 					class="<?php echo esc_attr( implode( ' ', $classes ) ); ?>" 
 					id="<?php echo esc_attr( $data[ 'fullname' ] ) ?>" 
-					oninvalid="setCustomValidity( '<?php echo apply_filters( 'wpto_setCustomValidity_text', __( 'Please, check', $wpto->text_domain ), $type ); ?>' )" 
+					oninvalid="<?php echo esc_attr( $validation_script ); ?>"
 					<?php wpto_echo_attrs( $html_attrs, array( 'oninvalid' ) ); ?>
 				/>	
 			<?php ; break;
@@ -89,6 +93,9 @@
 				><?php echo esc_textarea( $value ) ?></textarea>
 			<?php ; break;
 			case 'number' :
+				// phpcs:ignore WordPress.WP.I18n.NonSingularStringLiteralDomain -- The theme-derived domain is a legacy public contract.
+				$validation_message = apply_filters( 'wpto_setCustomValidity_text', __( 'Please, check', $wpto->text_domain ), $type );
+				$validation_script = 'setCustomValidity( ' . wp_json_encode( $validation_message ) . ' )';
 			?>
 				<input 
 					name="<?php echo esc_attr( $data[ 'name' ] ) ?>" 
@@ -96,8 +103,8 @@
 					value="<?php echo esc_attr( $value ) ?>" 
 					class="<?php echo esc_attr( implode( ' ', $classes ) ); ?>" 
 					id="<?php echo esc_attr( $data[ 'fullname' ] ) ?>" 
-					oninvalid="setCustomValidity( '<?php echo apply_filters( 'wpto_setCustomValidity_text', __( 'Please, check', $wpto->text_domain ), $type ); ?>' )" 
-					step=<?php echo ( isset( $attrs ) && isset( $attrs['step'] ) ) ? $attrs['step'] : 1 ; ?> 
+					oninvalid="<?php echo esc_attr( $validation_script ); ?>"
+					step="<?php echo esc_attr( ( isset( $attrs ) && isset( $attrs['step'] ) ) ? $attrs['step'] : 1 ); ?>"
 					<?php wpto_echo_attrs( $html_attrs, array( 'oninvalid', 'step' ) ); ?>
 				/>	
 			<?php ; break ;	
@@ -110,6 +117,7 @@
 				else :
 					$options = array();
 				endif;
+				$multiple = '';
 				if ( isset( $wpto->fields[ $data[ 'cat' ] ][1][ $data[ 'slug' ] ][2]['multiple'] )  )
 					$multiple = $wpto->fields[ $data[ 'cat' ] ][1][ $data[ 'slug' ] ][2]['multiple'] ? 'multiple ' : '' ;
 			?>
@@ -118,7 +126,7 @@
 					class="<?php echo esc_attr( implode( ' ', $classes ) ); ?>" 
 					id="<?php echo esc_attr( $data[ 'fullname' ] ) ?>" 
 					<?php wpto_echo_attrs( $html_attrs, array( 'multiple' ) ); ?>
-					<?php echo @$multiple; ?>
+					<?php echo esc_attr( $multiple ); ?>
 				><?php
 					$out = '';
 					$opt = '<option value="%1$s" %3$s>%2$s</option>';
@@ -126,11 +134,12 @@
 						$attrs = '';
 						if ( isset( $option['attrs'] ) && is_array( $option['attrs'] ) ) 
 							foreach( $option['attrs'] as $attr => $val )
-								$attrs .= $attr . '="' . $val . '" ';
+								$attrs .= esc_attr( $attr ) . '="' . esc_attr( $val ) . '" ';
 						//$out .= sprintf( $opt, $option['value'], $option['text'], selected( $option['value'], $value, false ) . $attrs );
-						$out .= sprintf( $opt, $option['value'], $option['text'], selected( in_array( $option['value'], $value ), true, false ) . $attrs );
+						$out .= sprintf( $opt, esc_attr( $option['value'] ), esc_html( $option['text'] ), selected( in_array( $option['value'], (array) $value ), true, false ) . $attrs );
 					endforeach;
 					$out = apply_filters( 'wpto:select_options', $out, $data[ 'name' ], $options );
+					// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Trusted extensions return complete option markup through this legacy filter.
 					echo $out;
 				?>
 				</select>
@@ -165,10 +174,12 @@
 				));
 			break;
 		default:
-			echo apply_filters( 'wpto_echo_custom_field', '', $data, $type, $value );
+			$custom_field = apply_filters( 'wpto_echo_custom_field', '', $data, $type, $value );
+			// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Trusted extensions return complete field markup through this legacy filter.
+			echo $custom_field;
 		};
 		
-		$out = apply_filters( 'wpto_echo_field', ob_get_contents(), $data, $type, $value );
-		ob_end_clean();
+		$out = apply_filters( 'wpto_echo_field', ob_get_clean(), $data, $type, $value );
+		// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Trusted extensions receive and return the complete rendered field markup.
 		echo $out;
 	}

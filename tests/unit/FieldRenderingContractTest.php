@@ -27,6 +27,11 @@ final class FieldRenderingContractTest extends TestCase
         Monkey\setUp();
         Functions\stubEscapeFunctions();
         Functions\stubTranslationFunctions();
+        Functions\when('wp_json_encode')->alias(
+            static function ($value): string {
+                return (string) json_encode($value, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+            }
+        );
     }
 
     protected function tearDown(): void
@@ -93,7 +98,7 @@ final class FieldRenderingContractTest extends TestCase
         self::assertStringContainsString('name="wpto_options[general][title]"', $html);
         self::assertStringContainsString('type="text"', $html);
         self::assertStringContainsString('class="general-title wpto-input wide-input"', $html);
-        self::assertStringContainsString("setCustomValidity( 'Validate text' )", $html);
+        self::assertStringContainsString('setCustomValidity( &quot;Validate text&quot; )', $html);
         self::assertStringNotContainsString('must-not-replace-public-name', $html);
         self::assertStringNotContainsString('must-not-replace-validation', $html);
     }
@@ -159,6 +164,83 @@ final class FieldRenderingContractTest extends TestCase
 
         self::assertStringContainsString('name="wpto_options[general][layout][]"', $html);
         self::assertStringContainsString('<option data-filtered="yes">Filtered</option>', $html);
+    }
+
+    public function testValidationAndNumberStepCannotBreakTheirHtmlAttributes(): void
+    {
+        $data = [
+            'cat' => 'general',
+            'fullname' => 'general-count',
+            'name' => 'wpto_options[general][count]',
+            'slug' => 'count',
+        ];
+        $this->setState(
+            [
+                'general' => [
+                    [],
+                    [
+                        'count' => [
+                            'number',
+                            'Count',
+                            ['step' => '1" autofocus onfocus="alert(1)'],
+                        ],
+                    ],
+                ],
+            ],
+            ['general' => ['count' => '7']]
+        );
+
+        Filters\expectApplied('wpto_setCustomValidity_text')
+            ->once()
+            ->with('Please, check', 'number')
+            ->andReturn('Bad");" onfocus="alert(1)');
+        Filters\expectApplied('wpto_echo_field')
+            ->once()
+            ->with(Mockery::type('string'), $data, 'number', '7')
+            ->andReturnFirstArg();
+
+        $html = $this->render($data);
+
+        self::assertStringContainsString('oninvalid="setCustomValidity( &quot;', $html);
+        self::assertStringContainsString('step="1&quot; autofocus onfocus=&quot;alert(1)"', $html);
+        self::assertStringNotContainsString(' onfocus="alert(1)"', $html);
+    }
+
+    public function testGeneratedSelectOptionsEscapeSchemaValuesBeforeTheRawHtmlFilter(): void
+    {
+        $options = [[
+            'value' => 'one" onclick="alert(1)',
+            'text' => '<b>Unsafe label</b>',
+            'attrs' => ['data-label' => 'x" autofocus="yes'],
+        ]];
+        $data = [
+            'cat' => 'general',
+            'fullname' => 'general-layout',
+            'name' => 'wpto_options[general][layout]',
+            'slug' => 'layout',
+        ];
+        $this->setState(
+            ['general' => [[], ['layout' => ['select', 'Layout', ['options' => $options]]]]],
+            ['general' => ['layout' => []]]
+        );
+
+        Functions\when('selected')->justReturn('');
+        Filters\expectApplied('wpto:select_options')
+            ->once()
+            ->with(Mockery::type('string'), 'wpto_options[general][layout]', $options)
+            ->andReturnFirstArg();
+        Filters\expectApplied('wpto_echo_field')
+            ->once()
+            ->with(Mockery::type('string'), $data, 'select', [])
+            ->andReturnFirstArg();
+
+        $html = $this->render($data);
+
+        self::assertStringContainsString('value="one&quot; onclick=&quot;alert(1)"', $html);
+        self::assertStringContainsString('data-label="x&quot; autofocus=&quot;yes"', $html);
+        self::assertStringContainsString('&lt;b&gt;Unsafe label&lt;/b&gt;', $html);
+        self::assertStringNotContainsString(' onclick="alert(1)"', $html);
+        self::assertStringNotContainsString('<b>Unsafe label</b>', $html);
     }
 
     public function testUnknownFieldTypeDelegatesToPublicCustomFieldFilter(): void
@@ -257,15 +339,11 @@ final class FieldRenderingContractTest extends TestCase
     }
 
     /**
-     * The imported renderer consumes a buffer created by its caller. Two levels
-     * keep PHPUnit's own output capture intact while preserving that behavior.
-     *
      * @param array<string, string> $data
      */
     private function render(array $data): string
     {
         $initialLevel = ob_get_level();
-        ob_start();
         ob_start();
 
         try {

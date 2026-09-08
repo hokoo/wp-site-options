@@ -5,8 +5,9 @@
 	function wpto_media_modal( $args ){
 		global $post;
 		$defaults = array(
-			'post_id'		=> $post->ID, 
-			'button_id'		=> 'button_id_' . rand( 0, 9999 ),
+			'post_id'		=> isset( $post->ID ) ? $post->ID : 0,
+			'button_id'		=> 'button_id_' . wp_rand( 0, 9999 ),
+			// phpcs:ignore WordPress.WP.I18n.MissingArgDomain -- These labels intentionally use the WordPress core default domain.
 			'button_text'	=> __( 'Select' ) . ' ' . __( 'Image' ),
 			'multiselect'	=> false,
 			'img_width'		=> 'initial',
@@ -14,16 +15,15 @@
 			'meta_key'		=> false, 
 			'key'			=> false, 
 			'thumb_size'	=> 'medium', 
-			//'option_name'	=> '',
+			'option_name'	=> '',
 		);
 		$r = ( object )wp_parse_args( $args, $defaults );
-		
-		$r->img_width = ! empty( $r->img_width ) ? 'style="width : ' . $r->img_width . ';"' : '' ;
 		?>
-		<div id="<?php echo $r->button_id ?>_wrapper" class="wptoMediaModal_wrapper">
-			<button class="wptoMediaModal" id="<?php echo $r->button_id ;?>" data-ids="<?php echo $r->button_id ?>_img_ids" data-preview="<?php echo $r->button_id ?>_preview" data-multiselect="<?php echo $r->multiselect ?>" ><?php echo $r->button_text ?></button><br />
-			<ul class="preview clearfix" id="<?php echo $r->button_id ?>_preview" >
+		<div id="<?php echo esc_attr( $r->button_id ); ?>_wrapper" class="wptoMediaModal_wrapper">
+			<button type="button" class="wptoMediaModal" id="<?php echo esc_attr( $r->button_id ); ?>" data-ids="<?php echo esc_attr( $r->button_id ); ?>_img_ids" data-preview="<?php echo esc_attr( $r->button_id ); ?>_preview" data-multiselect="<?php echo esc_attr( $r->multiselect ? 'true' : 'false' ); ?>" ><?php echo esc_html( $r->button_text ); ?></button><br />
+			<ul class="preview clearfix" id="<?php echo esc_attr( $r->button_id ); ?>_preview" >
 				<?php
+				$previews = '';
 				if ( $r->meta_key !== false ) :
 					if ( metadata_exists( 'post', $r->post_id, $r->meta_key ) ) {
 						$previews = get_post_meta( $r->post_id, $r->meta_key, TRUE );
@@ -33,15 +33,26 @@
 					$previews = $r->data ;
 					$key = $r->key ;
 				endif ;
-					$attachments = array_filter( explode( ',', $previews ) );
+					$attachments = array_filter( explode( ',', (string) $previews ) );
 					if ( $attachments ) {
 						foreach ( $attachments as $attachment_id ) {
-							echo '<li class="image" data-attachment_id="'.$attachment_id.'" ' . $r->img_width . '>'.wp_get_attachment_image( $attachment_id, $r->thumb_size ).'<span><a href="#" class="delete_slide" title="' . __( 'Delete' ) .'"></a></span></li>';					
+							?>
+							<li class="image" data-attachment_id="<?php echo esc_attr( $attachment_id ); ?>"<?php if ( ! empty( $r->img_width ) ) : ?> style="width: <?php echo esc_attr( $r->img_width ); ?>;"<?php endif; ?>>
+								<?php
+								// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Core returns the complete attachment image markup.
+								echo wp_get_attachment_image( absint( $attachment_id ), $r->thumb_size );
+								?>
+								<span><a href="#" class="delete_slide" title="<?php
+									// phpcs:ignore WordPress.WP.I18n.MissingArgDomain -- This label intentionally uses the WordPress core default domain.
+									echo esc_attr( __( 'Delete' ) );
+								?>"></a></span>
+							</li>
+							<?php
 						}
 					}
 				?>
 			</ul>
-			<input type="hidden" id="<?php echo $r->button_id ?>_img_ids" name="<?php echo $r->option_name ?>" value="<?php echo esc_attr( $previews ); ?>" />
+			<input type="hidden" id="<?php echo esc_attr( $r->button_id ); ?>_img_ids" name="<?php echo esc_attr( $r->option_name ); ?>" value="<?php echo esc_attr( $previews ); ?>" />
 			<br clear="all" />
 		</div>
 		<?php
@@ -59,8 +70,14 @@
 						preview : false,
 						ids : false,
 						multiSelect : false,
-						modalTitle : "<?php echo __( 'Select' ) . ' ' . __( 'Image' ) ?>",
-						modalButton : "<?php echo __( 'Select' ) ?>",
+						modalTitle : <?php
+							// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped,WordPress.WP.I18n.MissingArgDomain -- JSON encoding is the correct JavaScript context; labels use the core default domain.
+							echo wp_json_encode( __( 'Select' ) . ' ' . __( 'Image' ) );
+						?>,
+						modalButton : <?php
+							// phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped,WordPress.WP.I18n.MissingArgDomain -- JSON encoding is the correct JavaScript context; this label uses the core default domain.
+							echo wp_json_encode( __( 'Select' ) );
+						?>,
 						
 						attachment_ids : "" //Задавать этот параметр не следует, он чисто технологический
 					}, options );
@@ -71,7 +88,7 @@
 						var $preview = jQuery( '#' + options.preview );	
 							
 						// Uploading files
-						jQuery( this ).live( 'click', function( event ){
+						jQuery( this ).on( 'click', function( event ){
 					
 							event.preventDefault();
 							// If the media frame already exists, reopen it.
@@ -107,7 +124,10 @@
 										$preview.append('\
 											<li class="image" data-attachment_id="' + attachment.id + '">\
 												<img src="' + attachment.url + '" />\
-												<span><a href="#" class="delete_slide" title="<?php _e( 'Delete image', $wpto->text_domain ); ?>"></a></span>\
+											<span><a href="#" class="delete_slide" title="<?php
+												// phpcs:ignore WordPress.WP.I18n.NonSingularStringLiteralDomain -- The theme-derived domain is a legacy public contract.
+												echo esc_js( __( 'Delete image', $wpto->text_domain ) );
+											?>"></a></span>\
 											</li>');
 									}
 									$ids.trigger( 'selection' );

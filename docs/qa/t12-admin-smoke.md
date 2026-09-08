@@ -2,7 +2,7 @@
 
 ## Result
 
-`fail` — the browser harness is complete and the critical persistence path works, but it exposes a release-blocking PHP notice in production plugin code. The assertion remains active for T13; the gate has not been weakened or skipped.
+`pass` after T13 remediation. The first run exposed a release-blocking PHP notice after completing the critical persistence path; the unchanged assertion then passed against the corrected renderer.
 
 ## Environment
 
@@ -65,6 +65,8 @@ make setup
 npm run test:e2e
 ```
 
-Expected current result: one failing test with the notice above. Failure-only screenshot and trace artifacts are written beneath ignored `test-results/e2e/`.
+Expected current result: one passing test. Failure-only screenshot and trace artifacts are written beneath ignored `test-results/e2e/` if the regression returns.
 
-T13 must correct the production output-buffer handling and rerun this same assertion. Do not suppress the notice, disable `WP_DEBUG`, or relax the browser gate.
+## Remediation verification
+
+T13 corrected the production output-buffer handling without suppressing the notice, disabling `WP_DEBUG`, or relaxing the browser gate. The same test passed on WordPress 7.1/PHP 8.3 at `http://wp-site-options.local:18093`; browser console/page errors were absent and WordPress `debug.log` was empty. Full evidence is recorded in [`t13-remediation.md`](./t13-remediation.md).

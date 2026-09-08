@@ -37,7 +37,7 @@ final class SettingsRegistrationContractTest extends TestCase
             'text_domain' => 'consumer-theme',
             'fields' => [
                 'general' => [
-                    ['General settings', 'Consumer-defined description'],
+                    ['General settings', '<p>Consumer-defined <em>description</em></p>'],
                     [
                         'title' => ['text', 'Site title'],
                         'gallery' => ['gallery', 'Hero gallery'],
@@ -98,7 +98,7 @@ final class SettingsRegistrationContractTest extends TestCase
                     static function ($callback): bool {
                         return $callback instanceof \Closure
                             && $callback('', 'wpto_setting_section__general')
-                                === 'Consumer-defined description';
+                            === '<p>Consumer-defined <em>description</em></p>';
                     }
                 ),
                 5,
@@ -113,7 +113,14 @@ final class SettingsRegistrationContractTest extends TestCase
 
         wpto_menu_init();
 
-        self::assertSame([['reading', 'wpto_options']], $registeredSettings);
+        self::assertSame(
+            [[
+                'reading',
+                'wpto_options',
+                ['sanitize_callback' => 'wpto_sanitize_options'],
+            ]],
+            $registeredSettings
+        );
         self::assertSame(
             [[
                 'wpto_setting_section__general',
@@ -158,12 +165,12 @@ final class SettingsRegistrationContractTest extends TestCase
         Filters\expectApplied('wpto_setting_section_before')
             ->once()
             ->with('', 'wpto_setting_section__general')
-            ->andReturn('Consumer-defined description');
+            ->andReturn('<p>Consumer-defined <em>description</em></p>');
 
         ob_start();
         wpto_setting_section_before(['id' => 'wpto_setting_section__general']);
         $description = (string) ob_get_clean();
 
-        self::assertSame('Consumer-defined description', $description);
+        self::assertSame('<p>Consumer-defined <em>description</em></p>', $description);
     }
 }

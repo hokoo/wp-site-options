@@ -94,11 +94,13 @@ The optional third field element supports:
 | filter | `wpto:select_options` | `(options_html, field_name, options)` before select HTML is emitted. |
 | filter | `wpto_echo_custom_field` | `('', field_data, type, value)` for an unknown field type. |
 | filter | `wpto_echo_field` | `(captured_html, field_data, type, value)` around final field output. |
+| filter | `wpto_sanitize_options` | `(sanitized_options, original_input, fields)` after type-aware sanitization; trusted integrations may adjust the final stored value. |
 
 ### Global callable functions
 
 - `wpto_getoption($value, $data, $type)`
 - `wpto_menu_init()`
+- `wpto_sanitize_options($input)`
 - `wpto_setting_section_before($args)`
 - `wpto_echo_attrs($attrs, $stop_list = array())`
 - `wpto_echo_field($data)`
@@ -124,14 +126,14 @@ Changes from `tags/1.2` to the imported trunk are limited to:
 
 ## Imported risks to characterize
 
-These are findings, not approved behavior changes:
+These are the original imported findings. Resolved items are linked to the T13 evidence; the remaining items are compatibility risks, not approved behavior changes:
 
 - direct nested-array access can emit warnings for empty or partially configured options;
-- field rendering reads an output buffer without visibly starting its own buffer;
-- media JavaScript uses the removed jQuery `.live()` API;
+- field rendering formerly consumed a caller-owned output buffer; resolved in [`qa/t13-remediation.md`](./qa/t13-remediation.md);
+- media JavaScript formerly used the removed jQuery `.live()` API; resolved in [`qa/t13-remediation.md`](./qa/t13-remediation.md);
 - select rendering assumes an array value and renders `[]` even for a single select;
-- settings registration has no explicit sanitization callback;
-- multiple output paths need current Plugin Check escaping review;
+- settings registration formerly had no explicit sanitization callback; resolved in [`qa/t13-remediation.md`](./qa/t13-remediation.md);
+- output escaping findings were remediated while preserving trusted raw-HTML filter boundaries; see [`qa/t13-remediation.md`](./qa/t13-remediation.md);
 - readme field identifiers disagree with implementation identifiers;
 - localization follows the active theme text domain.
 

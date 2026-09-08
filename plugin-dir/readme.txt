@@ -4,12 +4,12 @@ Donate link: https://www.paypal.me/hokku
 Tags: options,site options,theme options,settings page,settings
 Requires at least: 6.0
 Requires PHP: 7.4
-Tested up to: 6.8
+Tested up to: 7.1
 Stable tag: 1.2.2
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
- The Site Options plugin is a simple and free product for adding your custom site options on default page Settings -> Reading. Just add a few lines in your functions file.
+ Add theme-defined custom options to the WordPress Settings -> Reading page with the plugin's established field and filter API.
 
 == Description ==
 
@@ -90,6 +90,7 @@ You can define custom fieldtype by special filter, if no one this types was dete
 = 1.2.2 =
 * Establish a tested maintenance baseline for modern WordPress and PHP versions.
 * Add reproducible development, verification, and release delivery tooling.
+* Harden settings sanitization and admin output while preserving legacy hooks and option shapes.
 
 = 1.2.1 - 05/03/17 =
 * GALLERY field type henceforth return array instead string

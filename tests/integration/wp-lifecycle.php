@@ -74,6 +74,10 @@ wpso_integration_assert(
 	isset( $registered_settings['wpto_options'] ),
 	'wpto_options was not registered with the real Settings API'
 );
+wpso_integration_assert(
+	'wpto_sanitize_options' === $registered_settings['wpto_options']['sanitize_callback'],
+	'wpto_options does not use the type-aware sanitization callback'
+);
 
 $stored = array(
 	'local_fixture' => array(
@@ -108,6 +112,99 @@ wpso_integration_assert(
 	'number value type changed'
 );
 
+$sanitizer_fields = array(
+	'security_fixture' => array(
+		array( 'Security fixture', '' ),
+		array(
+			'text'     => array( 'text', 'Text' ),
+			'email'    => array( 'email', 'Email' ),
+			'textarea' => array( 'textarea', 'Textarea' ),
+			'wysiwyg'  => array( 'wysiwyg', 'WYSIWYG' ),
+			'checkbox' => array( 'checkbox', 'Checkbox' ),
+			'number'   => array( 'number', 'Number' ),
+			'color'    => array( 'color', 'Color' ),
+			'photo'    => array( 'photo', 'Photo' ),
+			'gallery'  => array( 'gallery', 'Gallery' ),
+			'select'   => array( 'select', 'Select' ),
+			'custom'   => array( 'fixture_custom', 'Custom' ),
+		),
+	),
+);
+$wpto->fields = $sanitizer_fields;
+
+$valid_input = array(
+	'security_fixture' => array(
+		'text'       => 'Plain text',
+		'email'      => 'person@example.test',
+		'textarea'   => "Line one\nLine two",
+		'wysiwyg'    => '<p><strong>Allowed</strong></p>',
+		'checkbox'   => '1',
+		'number'     => '-12.50',
+		'color'      => '#AABBCC',
+		'photo'      => '0042',
+		'gallery'    => '10,020,',
+		'select'     => array( 'unlisted-one', 'unlisted-two' ),
+		'custom'     => array( 'trusted' => '<custom-markup>' ),
+		'undeclared' => array( 'legacy' => '<unchanged>' ),
+	),
+);
+wpso_integration_assert(
+	$valid_input === wpto_sanitize_options( $valid_input ),
+	'valid legacy values or nested shapes changed during sanitization'
+);
+
+$malicious_input = array(
+	'security_fixture' => array(
+		'text'       => array( 'raw' => '<script>bad</script>' ),
+		'email'      => 'not-an-email',
+		'textarea'   => "Hello<script>alert(1)</script>\nWorld",
+		'wysiwyg'    => '<p>Allowed</p><script>alert(1)</script>',
+		'checkbox'   => array( 'truthy' ),
+		'number'     => array( '12' ),
+		'color'      => 'red"><script>',
+		'photo'      => array( '42' ),
+		'gallery'    => '10,20<script>,oops,',
+		'select'     => array( 'safe', '<b>two</b>', array( 'nested' => '<raw>' ) ),
+		'custom'     => array( 'trusted' => '<custom-markup>' ),
+		'undeclared' => array( 'legacy' => '<unchanged>' ),
+	),
+);
+$expected_sanitized = array(
+	'security_fixture' => array(
+		'text'       => '',
+		'email'      => sanitize_email( $malicious_input['security_fixture']['email'] ),
+		'textarea'   => sanitize_textarea_field( $malicious_input['security_fixture']['textarea'] ),
+		'wysiwyg'    => wp_kses_post( $malicious_input['security_fixture']['wysiwyg'] ),
+		'checkbox'   => '1',
+		'number'     => '',
+		'color'      => '',
+		'photo'      => '',
+		'gallery'    => '10,20,',
+		'select'     => array( 'safe', 'two' ),
+		'custom'     => array( 'trusted' => '<custom-markup>' ),
+		'undeclared' => array( 'legacy' => '<unchanged>' ),
+	),
+);
+$sanitizer_filter_args = array();
+$sanitizer_filter = static function ( $sanitized, $original, $fields ) use ( &$sanitizer_filter_args ) {
+	$sanitizer_filter_args = array( $sanitized, $original, $fields );
+
+	return $sanitized;
+};
+add_filter( 'wpto_sanitize_options', $sanitizer_filter, 10, 3 );
+$actual_sanitized = wpto_sanitize_options( $malicious_input );
+remove_filter( 'wpto_sanitize_options', $sanitizer_filter, 10 );
+
+wpso_integration_assert( $expected_sanitized === $actual_sanitized, 'standard field sanitization changed' );
+wpso_integration_assert(
+	array( $expected_sanitized, $malicious_input, $sanitizer_fields ) === $sanitizer_filter_args,
+	'wpto_sanitize_options filter arguments changed'
+);
+wpso_integration_assert(
+	array() === wpto_sanitize_options( '<script>invalid top-level</script>' ),
+	'malformed top-level option data was not rejected'
+);
+
 $plugin_data = get_plugin_data( WP_PLUGIN_DIR . '/wp-site-options/wp-site-options.php', false, false );
 
 echo wp_json_encode(
@@ -119,6 +216,7 @@ echo wp_json_encode(
 		'registered_section' => $section_id,
 		'registered_fields'  => array_keys( $wp_settings_fields['reading'][ $section_id ] ),
 		'round_trip'         => $stored,
+		'sanitization'       => $actual_sanitized,
 	),
 	JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES
 );

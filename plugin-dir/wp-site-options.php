@@ -1,6 +1,6 @@
 <?php
 /*
-Plugin Name: Site Options
+Plugin Name: WP Site Options
 Plugin URI: http://nebster.net/en/plugins/site-options/
 Description: Allow specify theme options
 Version: 1.2.2
@@ -8,6 +8,9 @@ Requires at least: 6.0
 Requires PHP: 7.4
 Author: Игорь Тронь
 Author URI: http://nebster.net
+License: GPLv2 or later
+License URI: https://www.gnu.org/licenses/gpl-2.0.html
+Text Domain: wp-site-options
 Domain Path: /languages
 */	
 	if ( ! defined( 'ABSPATH' ) ) exit;

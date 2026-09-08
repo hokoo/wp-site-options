@@ -545,7 +545,7 @@ Verification:
 
 ### T12. Добавить authenticated admin smoke
 
-Status: in_progress
+Status: completed
 Goal: Проверить критический пользовательский сценарий Settings → Reading в браузере.  
 Scope:
 
@@ -591,7 +591,7 @@ Verification:
 
 ### T13. Исправить release-blocking compatibility/security findings
 
-Status: in_progress
+Status: completed
 Goal: Устранить только доказанные блокеры утверждённой матрицы и Plugin Check без изменения публичного API.  
 Scope:
 
