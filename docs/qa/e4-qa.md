@@ -1,13 +1,13 @@
 # E4 independent QA report
 
-- Date: 2026-09-08
-- Outcome: **BLOCKED_PENDING_DIRECT_DOWNLOAD**
+- Date: 2026-09-09
+- Outcome: **PASS**
 - Hosted source commit: `abeb47ee1b12cacfb8c188cb5e6945b0630b2f7a`
 - GitHub Actions run: `34252959685` (attempt `1`)
 - Artifact ID: `10066750684`
 - Artifact name: `wp-site-options-candidate-abeb47ee1b12cacfb8c188cb5e6945b0630b2f7a-34252959685-1`
 
-All independently available T16-T18 checks passed. The sole unmet T19 acceptance criterion is an independent QA download and revalidation of the bytes stored by GitHub Actions. The anonymous download endpoint returned HTTP `401`, and this environment has no authenticated GitHub CLI session or token. The candidate must not be promoted as the single release candidate until that check is resumed with read-only Actions access.
+All T16-T19 acceptance criteria and Definitions of Done passed. Independent QA downloaded the persisted GitHub Actions candidate, verified its checksum and exact inner hash, strictly revalidated it against the exact hosted source, and proved byte identity with a fresh deterministic rebuild. The candidate is accepted as the single release candidate for the tested source commit.
 
 ## Hosted run and artifact evidence
 
@@ -53,7 +53,7 @@ curl -sS -o /dev/null \
   https://api.github.com/repos/hokoo/wp-site-options/actions/artifacts/10066750684/zip
 ```
 
-Observed result: `anonymous_download_http=401`, with no redirect. `gh auth status` also exited `1`; `GH_TOKEN` and `GITHUB_TOKEN` were absent. No login was attempted and no credential was requested or read.
+Observed result on the initial attempt: `anonymous_download_http=401`, with no redirect. `gh auth status` also exited `1`; `GH_TOKEN` and `GITHUB_TOKEN` were absent. No login was attempted and no credential was requested or read during that attempt. The authenticated independent download that closed this gap is recorded below.
 
 ## Independent deterministic build and ZIP validation
 
@@ -108,40 +108,32 @@ Independent static inspection and `actionlint` (exit `0`) confirmed:
 - all 13 external Action uses are pinned to full 40-character commit SHAs;
 - summary fields are format-validated before publication.
 
-The successful hosted step sequence is strong transport evidence: GitHub's same job uploaded, downloaded, compared, checksum-checked, and strictly revalidated the candidate. The deterministic local rebuild independently reproduces the recorded inner ZIP hash. Neither substitutes for T19's explicit requirement that the independent QA actor directly download and revalidate the persisted artifact.
+The successful hosted step sequence proves GitHub's same-job upload/download transport and fail-closed revalidation. Independent QA additionally downloaded the persisted artifact itself and reproduced its inner bytes from source, satisfying T19 without relying only on CI's own claims.
 
-## Blocker and exact resume path
+## Direct-download closure
 
-No implementation defect was found. No risk acceptance is recommended: one narrowly scoped authority is needed — a GitHub fine-grained token or authenticated session for repository `hokoo/wp-site-options` with **Actions: read** only. Repository contents write, Actions write, GitHub Release write, WordPress.org, and SVN credentials are not needed.
+On 2026-09-09, QA read only the single exact `GITHUB_TOKEN=` value from the ignored local `.env`; the file was not sourced. The value was passed only to the `gh run download` process as `GH_TOKEN` and was never printed or persisted. The exact download target was:
 
-After exposing that token as `GH_TOKEN`, resume with the exact hosted IDs:
-
-```bash
-qa_dir="$(mktemp -d /tmp/wpso-e4qa-resume.XXXXXX)"
-artifact_name='wp-site-options-candidate-abeb47ee1b12cacfb8c188cb5e6945b0630b2f7a-34252959685-1'
-
-gh run download 34252959685 \
-  --repo hokoo/wp-site-options \
-  --name "${artifact_name}" \
-  --dir "${qa_dir}/download"
-
-diff -u \
-  <(printf '%s\n' wp-site-options.zip wp-site-options.zip.sha256) \
-  <(find "${qa_dir}/download" -mindepth 1 -maxdepth 1 -type f -printf '%f\n' | sort)
-( cd "${qa_dir}/download" && sha256sum -c wp-site-options.zip.sha256 )
-test "$(sha256sum "${qa_dir}/download/wp-site-options.zip" | awk '{print $1}')" = \
-  '43ab994fa0f085d31c22acc5846e4a4c6c095b244a6b9b544800c0e8832b9650'
-
-git worktree add --detach "${qa_dir}/source" abeb47ee1b12cacfb8c188cb5e6945b0630b2f7a
-SOURCE_DATE_EPOCH=1788885888 \
-  "${qa_dir}/source/scripts/validate-release-zip.sh" \
-  "${qa_dir}/download/wp-site-options.zip" 1.2.2
-SOURCE_DATE_EPOCH=1788885888 \
-  "${qa_dir}/source/scripts/build-release-zip.sh" "${qa_dir}/local.zip"
-cmp "${qa_dir}/local.zip" "${qa_dir}/download/wp-site-options.zip"
-PLUGIN_ZIP="${qa_dir}/download/wp-site-options.zip" \
-WP_SITE_OPTIONS_IT_ARTIFACTS="${qa_dir}/integration-evidence" \
-  "${qa_dir}/source/scripts/test-integration.sh" all
+```text
+repository=hokoo/wp-site-options
+run_id=34252959685
+artifact_id=10066750684
+artifact_name=wp-site-options-candidate-abeb47ee1b12cacfb8c188cb5e6945b0630b2f7a-34252959685-1
 ```
 
-The download must contain exactly `wp-site-options.zip` and `wp-site-options.zip.sha256`; checksum, strict validation, deterministic `cmp`, and both installation profiles must pass. Only then can T19 become `PASS` and the artifact be accepted as the single release candidate. The artifact is currently scheduled to expire at `2026-12-07T16:45:02Z`.
+The download went to a new directory created with `mktemp`. Verification produced:
+
+```text
+download_manifest=exact_two_regular_files
+wp-site-options.zip: OK
+inner_zip_size=11577 bytes
+inner_zip_sha256=43ab994fa0f085d31c22acc5846e4a4c6c095b244a6b9b544800c0e8832b9650
+strict_validator=valid version 1.2.2
+downloaded_vs_rebuild_cmp=identical
+```
+
+The top-level manifest was exactly `wp-site-options.zip` plus `wp-site-options.zip.sha256`; both were regular files and neither was a symlink. `sha256sum -c` passed. A detached worktree at exact commit `abeb47ee1b12cacfb8c188cb5e6945b0630b2f7a` validated the downloaded ZIP with version `1.2.2` and `SOURCE_DATE_EPOCH=1788885888`, rebuilt the ZIP, and matched the downloaded bytes with `cmp`.
+
+Manual inspection was repeated on the downloaded bytes: `unzip -tqq` passed; `unzip -Z1` matched the canonical 14-entry manifest; the only root was `wp-site-options/`; forbidden-file scanning was clean; directories were `0755`, files were `0644`; all timestamps were UTC `2026-09-08 16:44:48`; archive/entry comments and extra fields were absent.
+
+Because the downloaded ZIP was byte-identical to the exact independently rebuilt ZIP already used by the minimum/latest candidate integration above, the prior WordPress 6.0/PHP 7.4.33 and WordPress 7.1/PHP 8.3.33 installation evidence applies to the hosted bytes without rerunning Docker. No implementation defects, missing verification, public-contract regressions, or risk acceptance remain. The expected 90-day GitHub artifact expiration at `2026-12-07T16:45:02Z` is the documented retention policy, not a QA defect.
