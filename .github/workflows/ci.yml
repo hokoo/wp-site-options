@@ -1,0 +1,188 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - converted_to_draft
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  php-quality:
+    name: PHP quality / PHP ${{ matrix.php }}
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        php:
+          - '7.4'
+          - '8.3'
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: dom, filter, json, libxml, mbstring, tokenizer, xmlwriter
+          coverage: none
+          tools: composer:v2
+
+      - name: Locate Composer cache
+        id: composer-cache
+        shell: bash
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore Composer package cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-php-${{ matrix.php }}-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-php-${{ matrix.php }}-composer-
+
+      - name: Validate Composer metadata
+        run: composer validate --strict --no-interaction
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Audit Composer dependencies
+        run: composer audit --no-interaction
+
+      - name: Lint PHP
+        run: composer lint:php
+
+      - name: Run unit tests
+        run: composer test:unit
+
+  wordpress-integration:
+    name: WordPress integration / ${{ matrix.profile }}
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        profile:
+          - minimum
+          - latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run ${{ matrix.profile }} integration profile
+        run: scripts/test-integration.sh "${{ matrix.profile }}"
+
+      - name: Upload integration failure diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: integration-${{ matrix.profile }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tests/integration/artifacts/
+          if-no-files-found: warn
+          retention-days: 7
+
+  plugin-check:
+    name: Plugin Check
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run zero-error Plugin Check gate
+        run: scripts/plugin-check.sh
+
+      - name: Upload Plugin Check failure diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: plugin-check-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tests/integration/artifacts/
+          if-no-files-found: warn
+          retention-days: 7
+
+  admin-browser-smoke:
+    name: Authenticated admin smoke
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Audit Node dependencies
+        run: npm audit --audit-level=high
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Prepare isolated Compose configuration
+        shell: bash
+        run: |
+          cp .env.example .env
+          sed -i "s/^COMPOSE_PROJECT_NAME=.*/COMPOSE_PROJECT_NAME=wpsoci${{ github.run_id }}a${{ github.run_attempt }}/" .env
+
+      - name: Set up local WordPress
+        run: ./scripts/setup-local.sh
+
+      - name: Run authenticated admin smoke
+        run: npm run test:e2e
+
+      - name: Capture browser and Compose diagnostics
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          mkdir -p test-results/compose
+          if [[ -f .env ]]; then
+            docker compose ps --all > test-results/compose/compose-ps.log 2>&1 || true
+            docker compose logs --no-color > test-results/compose/compose.log 2>&1 || true
+          fi
+          if [[ -f local-dev/wp-content/debug.log ]]; then
+            cp local-dev/wp-content/debug.log test-results/compose/wp-debug.log
+          fi
+
+      - name: Clean up isolated Compose project
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          if [[ -f .env ]]; then
+            ./scripts/reset-local.sh --yes
+          fi
+
+      - name: Upload browser failure diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: admin-browser-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/
+          if-no-files-found: warn
+          retention-days: 7
