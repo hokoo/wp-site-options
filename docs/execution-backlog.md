@@ -316,17 +316,18 @@ Verification:
 
 ### T7. Добавить Make-команды и development guide
 
-Status: waiting_dependency  
+Status: in_progress
 Goal: Дать разработчику стабильный command interface для setup, работы, тестов, логов и безопасного reset.  
 Scope:
 
-- Make targets `setup`, `up`, `down`, `reset`, `logs`, `shell`, `test`, `lint`, `release-zip`;
+- Make targets `setup`, `up`, `down`, `reset`, `logs`, `shell`, `test`, `lint`;
 - `docs/development.md` для WSL2/Docker Desktop/Linux;
 - troubleshooting домена, ports, permissions и symlink.
 
 Out of Scope:
 
 - release runbook;
+- `release-zip` target до появления deterministic builder в T17;
 - CI implementation;
 - автоматическое изменение системных DNS/hosts.
 
@@ -498,7 +499,7 @@ Verification:
 
 ### T11. Добавить WordPress integration tests
 
-Status: waiting_dependency  
+Status: in_progress
 Goal: Проверить plugin lifecycle, settings registration и persistence в реальном WordPress.  
 Scope:
 
