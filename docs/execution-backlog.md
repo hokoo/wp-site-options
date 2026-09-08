@@ -75,7 +75,7 @@ Verification:
 
 ### T2. Зафиксировать provenance и публичные контракты
 
-Status: waiting_dependency  
+Status: completed  
 Goal: Сделать происхождение snapshot и compatibility boundary проверяемыми до любых remediation changes.  
 Scope:
 
