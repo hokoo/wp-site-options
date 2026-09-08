@@ -1,6 +1,6 @@
 # Execution backlog: WP Site Options delivery
 
-Статус документа: выполнение в процессе; E1-E4 и задачи T20-T23 завершены.
+Статус документа: выполнение в процессе; E1-E5 завершены.
 Источник: [delivery-plan.md](./delivery-plan.md)  
 Дата: 2026-09-08
 
@@ -1115,7 +1115,7 @@ Verification:
 
 ### T24. Провести независимый QA эпика E5
 
-Status: todo
+Status: completed
 Goal: Независимо проверить tag parsing, publish boundaries, idempotency и real dry-run evidence.  
 Scope:
 
@@ -1160,7 +1160,7 @@ Verification:
 
 ### T25. Оформить release/recovery runbook и protections
 
-Status: waiting_dependency  
+Status: todo
 Goal: Сделать `master` и tag-driven production процесс управляемыми до первого реального deploy.  
 Scope:
 
