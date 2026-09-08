@@ -645,7 +645,7 @@ Verification:
 
 ### T14. Реализовать CI workflow для master и pull requests
 
-Status: waiting_dependency  
+Status: in_progress
 Goal: Сделать обязательные quality gates автоматическими и воспроизводимыми на GitHub Actions.  
 Scope:
 
