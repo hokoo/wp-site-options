@@ -16,6 +16,7 @@ Configure branch protection for `master` with these exact checks:
 - `WordPress integration / latest`
 - `Plugin Check`
 - `Authenticated admin smoke`
+- `Release contracts`
 - `Release candidate`
 
 Matrix values and explicit job names are part of this contract. Renaming one requires updating branch protection at the same time.
@@ -30,11 +31,12 @@ Matrix values and explicit job names are part of this contract. Renaming one req
 | WordPress integration / latest | `scripts/test-integration.sh latest`: current WordPress and PHP 8.3 lifecycle/persistence checks. |
 | Plugin Check | `scripts/plugin-check.sh`: pinned Plugin Check strict JSON with a zero-ERROR requirement. |
 | Authenticated admin smoke | npm audit, isolated local Compose setup, and the Playwright login → Settings → Reading → save/reload path. |
-| Release candidate | Runs only after all four upstream job IDs succeed, which covers all six quality gates. Derives normalized version/HEAD epoch, builds twice, validates, compares, uploads only the ZIP/checksum, downloads by immutable artifact ID, and revalidates the service copy. |
+| Release contracts | `make test-release-contracts`: strict production/prerelease tag-parser table and isolated local SVN deployment fixtures. |
+| Release candidate | Runs only after all five upstream job IDs succeed, which covers all seven quality gates. Derives normalized version/HEAD epoch, builds twice, validates, compares, uploads only the ZIP/checksum, downloads by immutable artifact ID, and revalidates the service copy. |
 
 The authenticated smoke keeps `wp-site-options.local` in the browser URL. Its Chromium host-resolver rule maps that name to `127.0.0.1`; CI does not mutate `/etc/hosts`. The Compose project name contains the GitHub run id and attempt, and an `always()` cleanup invokes the explicit project-scoped reset.
 
-The final job has `needs` on `php-quality`, `wordpress-integration`, `plugin-check`, and `admin-browser-smoke`. Matrix completion therefore gates artifact creation on both PHP jobs, both WordPress profiles, Plugin Check, and the authenticated browser smoke. It uses the same draft-PR exclusion as every upstream job.
+The final job has `needs` on `php-quality`, `wordpress-integration`, `plugin-check`, `admin-browser-smoke`, and `release-contracts`. Matrix completion therefore gates artifact creation on both PHP jobs, both WordPress profiles, Plugin Check, the authenticated browser smoke, and the release-contract fixtures. It uses the same draft-PR exclusion as every upstream job.
 
 ## Release candidate artifact
 
@@ -98,6 +100,7 @@ composer test:unit
 scripts/test-integration.sh minimum
 scripts/test-integration.sh latest
 scripts/plugin-check.sh
+make test-release-contracts
 
 npm ci --no-audit --no-fund
 npm audit --audit-level=high

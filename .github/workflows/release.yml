@@ -1,0 +1,544 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]*.[0-9]*.[0-9]*'
+      - 'v-[0-9]*.[0-9]*.[0-9]*'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wp-site-options-release
+  cancel-in-progress: false
+
+jobs:
+  release_intent:
+    name: Release intent
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      tag: ${{ steps.parse_tag.outputs.tag }}
+      package_version: ${{ steps.parse_tag.outputs.package_version }}
+      release_version: ${{ steps.parse_tag.outputs.release_version }}
+      is_prerelease: ${{ steps.parse_tag.outputs.is_prerelease }}
+      source_date_epoch: ${{ steps.source_contract.outputs.source_date_epoch }}
+    steps:
+      - name: Reject deleted, forced, or non-creation tag events
+        shell: bash
+        env:
+          EVENT_CREATED: ${{ github.event.created }}
+          EVENT_DELETED: ${{ github.event.deleted }}
+          EVENT_FORCED: ${{ github.event.forced }}
+          EVENT_SHA: ${{ github.sha }}
+        run: |
+          set -Eeuo pipefail
+          [[ "${EVENT_CREATED}" == 'true' ]]
+          [[ "${EVENT_DELETED}" == 'false' ]]
+          [[ "${EVENT_FORCED}" == 'false' ]]
+          [[ "${EVENT_SHA}" =~ ^[0-9a-f]{40}$ ]]
+
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Parse strict release tag
+        id: parse_tag
+        shell: bash
+        env:
+          RAW_TAG: ${{ github.ref_name }}
+        run: scripts/parse-release-tag.sh "${RAW_TAG}" --github-output "${GITHUB_OUTPUT}"
+
+      - name: Validate tag source and package metadata
+        id: source_contract
+        shell: bash
+        env:
+          EVENT_SHA: ${{ github.sha }}
+          PACKAGE_VERSION: ${{ steps.parse_tag.outputs.package_version }}
+          RAW_TAG: ${{ steps.parse_tag.outputs.tag }}
+        run: |
+          set -Eeuo pipefail
+
+          [[ "${EVENT_SHA}" =~ ^[0-9a-f]{40}$ ]]
+          [[ "${RAW_TAG}" =~ ^v-?[0-9] ]]
+          [[ "$(git rev-parse HEAD)" == "${EVENT_SHA}" ]]
+          [[ "$(git rev-parse "refs/tags/${RAW_TAG}^{commit}")" == "${EVENT_SHA}" ]]
+          git merge-base --is-ancestor "${EVENT_SHA}" refs/remotes/origin/master
+          [[ -z "$(git status --porcelain=v1 --untracked-files=all)" ]]
+
+          mapfile -t header_versions < <(sed -n 's/^[[:space:]]*Version:[[:space:]]*\([^[:space:]]*\)[[:space:]]*$/\1/p' plugin-dir/wp-site-options.php | tr -d '\r')
+          (( ${#header_versions[@]} == 1 ))
+          [[ "${header_versions[0]}" == "${PACKAGE_VERSION}" ]]
+
+          mapfile -t stable_tags < <(sed -n 's/^[[:space:]]*Stable tag:[[:space:]]*\([^[:space:]]*\)[[:space:]]*$/\1/p' plugin-dir/readme.txt | tr -d '\r')
+          (( ${#stable_tags[@]} == 1 ))
+          [[ "${stable_tags[0]}" == "${PACKAGE_VERSION}" ]]
+
+          changelog_result="$(awk -v version_heading="= ${PACKAGE_VERSION} =" '
+            {
+              sub(/\r$/, "")
+              if ($0 == "== Changelog ==") {
+                changelog_headings++
+                in_changelog = 1
+                next
+              }
+              if (in_changelog && $0 == version_heading) version_headings++
+            }
+            END { printf "%d:%d", changelog_headings + 0, version_headings + 0 }
+          ' plugin-dir/readme.txt)"
+          [[ "${changelog_result}" == '1:1' ]]
+
+          source_date_epoch="$(git show -s --format=%ct HEAD)"
+          [[ "${source_date_epoch}" =~ ^[0-9]+$ ]]
+          (( source_date_epoch >= 315532800 && source_date_epoch <= 4354819198 ))
+          source_date_epoch="$(( source_date_epoch - ( source_date_epoch % 2 ) ))"
+          printf 'source_date_epoch=%s\n' "${source_date_epoch}" >> "${GITHUB_OUTPUT}"
+
+  php_quality:
+    name: Release PHP quality / PHP ${{ matrix.php }}
+    needs: release_intent
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        php:
+          - '7.4'
+          - '8.3'
+    permissions:
+      contents: read
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up PHP ${{ matrix.php }}
+        uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: dom, filter, json, libxml, mbstring, tokenizer, xmlwriter
+          coverage: none
+          tools: composer:v2
+
+      - name: Locate Composer cache
+        id: composer_cache
+        shell: bash
+        run: echo "dir=$(composer config cache-files-dir)" >> "${GITHUB_OUTPUT}"
+
+      - name: Restore Composer package cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.composer_cache.outputs.dir }}
+          key: ${{ runner.os }}-release-php-${{ matrix.php }}-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-release-php-${{ matrix.php }}-composer-
+
+      - name: Validate Composer metadata
+        run: composer validate --strict --no-interaction
+
+      - name: Install Composer dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+
+      - name: Audit Composer dependencies
+        run: composer audit --no-interaction
+
+      - name: Lint PHP
+        run: composer lint:php
+
+      - name: Run unit tests
+        run: composer test:unit
+
+  wordpress_integration:
+    name: Release WordPress integration / ${{ matrix.profile }}
+    needs: release_intent
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        profile:
+          - minimum
+          - latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Run ${{ matrix.profile }} integration profile
+        run: scripts/test-integration.sh "${{ matrix.profile }}"
+
+      - name: Upload integration failure diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-integration-${{ matrix.profile }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tests/integration/artifacts/
+          if-no-files-found: warn
+          retention-days: 7
+
+  plugin_check:
+    name: Release Plugin Check
+    needs: release_intent
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Run zero-error Plugin Check gate
+        run: scripts/plugin-check.sh
+
+      - name: Upload Plugin Check failure diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-plugin-check-${{ github.run_id }}-${{ github.run_attempt }}
+          path: tests/integration/artifacts/
+          if-no-files-found: warn
+          retention-days: 7
+
+  admin_browser_smoke:
+    name: Release authenticated admin smoke
+    needs: release_intent
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Audit Node dependencies
+        run: npm audit --audit-level=high
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Prepare isolated Compose configuration
+        shell: bash
+        run: |
+          cp .env.example .env
+          sed -i "s/^COMPOSE_PROJECT_NAME=.*/COMPOSE_PROJECT_NAME=wpsorel${{ github.run_id }}a${{ github.run_attempt }}/" .env
+
+      - name: Set up local WordPress
+        run: ./scripts/setup-local.sh
+
+      - name: Run authenticated admin smoke
+        run: npm run test:e2e
+
+      - name: Capture browser and Compose diagnostics
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          mkdir -p test-results/compose
+          if [[ -f .env ]]; then
+            docker compose ps --all > test-results/compose/compose-ps.log 2>&1 || true
+            docker compose logs --no-color > test-results/compose/compose.log 2>&1 || true
+          fi
+          if [[ -f local-dev/wp-content/debug.log ]]; then
+            cp local-dev/wp-content/debug.log test-results/compose/wp-debug.log
+          fi
+
+      - name: Clean up isolated Compose project
+        if: ${{ always() }}
+        shell: bash
+        run: |
+          if [[ -f .env ]]; then
+            ./scripts/reset-local.sh --yes
+          fi
+
+      - name: Upload browser failure diagnostics
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-admin-browser-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/
+          if-no-files-found: warn
+          retention-days: 7
+
+  release_contracts:
+    name: Release contracts
+    needs: release_intent
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Run release tag and SVN deployment contracts
+        run: make test-release-contracts
+
+  release_candidate:
+    name: Build release artifact
+    needs:
+      - release_intent
+      - php_quality
+      - wordpress_integration
+      - plugin_check
+      - admin_browser_smoke
+      - release_contracts
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    outputs:
+      artifact_id: ${{ steps.upload_candidate.outputs['artifact-id'] }}
+      artifact_name: ${{ steps.candidate.outputs.artifact_name }}
+      zip_sha256: ${{ steps.candidate.outputs.zip_sha256 }}
+    env:
+      RELEASE_VERSION: ${{ needs.release_intent.outputs.package_version }}
+      SOURCE_DATE_EPOCH: ${{ needs.release_intent.outputs.source_date_epoch }}
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Build and validate deterministic release twice
+        id: candidate
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ "${RELEASE_VERSION}" =~ ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          [[ "${SOURCE_DATE_EPOCH}" =~ ^[0-9]+$ ]]
+
+          first_zip="${GITHUB_WORKSPACE}/dist/wp-site-options.zip"
+          second_zip="${RUNNER_TEMP}/wp-site-options-second.zip"
+          scripts/build-release-zip.sh "${first_zip}"
+          scripts/build-release-zip.sh "${second_zip}"
+          scripts/validate-release-zip.sh "${first_zip}" "${RELEASE_VERSION}"
+          scripts/validate-release-zip.sh "${second_zip}" "${RELEASE_VERSION}"
+          cmp "${first_zip}" "${second_zip}"
+
+          zip_sha256="$(sha256sum "${first_zip}" | awk '{ print $1 }')"
+          [[ "${zip_sha256}" =~ ^[0-9a-f]{64}$ ]]
+          printf '%s  wp-site-options.zip\n' "${zip_sha256}" > dist/wp-site-options.zip.sha256
+          ( cd dist && sha256sum -c wp-site-options.zip.sha256 )
+
+          artifact_name="wp-site-options-release-${GITHUB_SHA}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          [[ "${artifact_name}" =~ ^wp-site-options-release-[0-9a-f]{40}-[0-9]+-[0-9]+$ ]]
+          printf 'zip_sha256=%s\n' "${zip_sha256}" >> "${GITHUB_OUTPUT}"
+          printf 'artifact_name=%s\n' "${artifact_name}" >> "${GITHUB_OUTPUT}"
+
+      - name: Upload immutable release artifact
+        id: upload_candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: ${{ steps.candidate.outputs.artifact_name }}
+          path: |
+            dist/wp-site-options.zip
+            dist/wp-site-options.zip.sha256
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+          compression-level: 0
+
+      - name: Require fresh artifact round-trip path
+        shell: bash
+        run: |
+          [[ ! -e "${RUNNER_TEMP}/release-artifact-download" ]]
+
+      - name: Download artifact by immutable ID
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ steps.upload_candidate.outputs['artifact-id'] }}
+          path: ${{ runner.temp }}/release-artifact-download
+
+      - name: Verify artifact service copy
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          download_dir="${RUNNER_TEMP}/release-artifact-download"
+          mapfile -d '' entries < <(find "${download_dir}" -mindepth 1 -maxdepth 1 -print0)
+          (( ${#entries[@]} == 2 ))
+          [[ -f "${download_dir}/wp-site-options.zip" && ! -L "${download_dir}/wp-site-options.zip" ]]
+          [[ -f "${download_dir}/wp-site-options.zip.sha256" && ! -L "${download_dir}/wp-site-options.zip.sha256" ]]
+          ( cd "${download_dir}" && sha256sum -c wp-site-options.zip.sha256 )
+          cmp dist/wp-site-options.zip "${download_dir}/wp-site-options.zip"
+          cmp dist/wp-site-options.zip.sha256 "${download_dir}/wp-site-options.zip.sha256"
+          scripts/validate-release-zip.sh "${download_dir}/wp-site-options.zip" "${RELEASE_VERSION}"
+
+  publish_github:
+    name: Publish GitHub Release
+    needs:
+      - release_intent
+      - release_candidate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    env:
+      RELEASE_TAG: ${{ needs.release_intent.outputs.tag }}
+      RELEASE_VERSION: ${{ needs.release_intent.outputs.package_version }}
+      RELEASE_PRERELEASE: ${{ needs.release_intent.outputs.is_prerelease }}
+      RELEASE_ZIP_SHA256: ${{ needs.release_candidate.outputs.zip_sha256 }}
+      SOURCE_DATE_EPOCH: ${{ needs.release_intent.outputs.source_date_epoch }}
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Require fresh publish download path
+        run: test ! -e "${RUNNER_TEMP}/publish-download"
+
+      - name: Download verified release artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.release_candidate.outputs.artifact_id }}
+          path: ${{ runner.temp }}/publish-download
+
+      - name: Revalidate downloaded release artifact
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          download_dir="${RUNNER_TEMP}/publish-download"
+          mapfile -d '' entries < <(find "${download_dir}" -mindepth 1 -maxdepth 1 -print0)
+          (( ${#entries[@]} == 2 ))
+          ( cd "${download_dir}" && sha256sum -c wp-site-options.zip.sha256 )
+          [[ "$(sha256sum "${download_dir}/wp-site-options.zip" | awk '{ print $1 }')" == "${RELEASE_ZIP_SHA256}" ]]
+          scripts/validate-release-zip.sh "${download_dir}/wp-site-options.zip" "${RELEASE_VERSION}"
+          scripts/build-release-zip.sh "${RUNNER_TEMP}/publish-rebuild.zip"
+          cmp "${download_dir}/wp-site-options.zip" "${RUNNER_TEMP}/publish-rebuild.zip"
+
+      - name: Verify current remote source before publication
+        shell: bash
+        env:
+          EVENT_SHA: ${{ github.sha }}
+          PUBLIC_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -Eeuo pipefail
+          scripts/verify-release-ref.sh \
+            --tag "${RELEASE_TAG}" \
+            --expected-commit "${EVENT_SHA}" \
+            --repository "${PUBLIC_REPOSITORY}" \
+            --check-master
+
+      - name: Publish or verify idempotent GitHub Release
+        shell: bash
+        env:
+          EXPECTED_COMMIT: ${{ github.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          scripts/publish-github-release.sh \
+            --tag "${RELEASE_TAG}" \
+            --expected-commit "${EXPECTED_COMMIT}" \
+            --package-version "${RELEASE_VERSION}" \
+            --zip "${RUNNER_TEMP}/publish-download/wp-site-options.zip" \
+            --checksum "${RUNNER_TEMP}/publish-download/wp-site-options.zip.sha256" \
+            --prerelease "${RELEASE_PRERELEASE}"
+
+  deploy_wordpress_org:
+    name: Deploy WordPress.org
+    if: ${{ success() && needs.release_intent.outputs.is_prerelease == 'false' }}
+    needs:
+      - release_intent
+      - release_candidate
+      - publish_github
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: wordpress-org
+    permissions:
+      contents: read
+    env:
+      RELEASE_TAG: ${{ needs.release_intent.outputs.tag }}
+      RELEASE_VERSION: ${{ needs.release_intent.outputs.package_version }}
+      RELEASE_ZIP_SHA256: ${{ needs.release_candidate.outputs.zip_sha256 }}
+      SOURCE_DATE_EPOCH: ${{ needs.release_intent.outputs.source_date_epoch }}
+    steps:
+      - name: Check out tagged source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Reassert production tag boundary
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          parsed="$(scripts/parse-release-tag.sh "${RELEASE_TAG}")"
+          grep -Fx 'is_prerelease=false' <<< "${parsed}" >/dev/null
+          grep -Fx "package_version=${RELEASE_VERSION}" <<< "${parsed}" >/dev/null
+
+      - name: Require fresh WordPress.org download path
+        run: test ! -e "${RUNNER_TEMP}/wordpress-org-download"
+
+      - name: Download verified release artifact
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          artifact-ids: ${{ needs.release_candidate.outputs.artifact_id }}
+          path: ${{ runner.temp }}/wordpress-org-download
+
+      - name: Revalidate WordPress.org candidate
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          download_dir="${RUNNER_TEMP}/wordpress-org-download"
+          mapfile -d '' entries < <(find "${download_dir}" -mindepth 1 -maxdepth 1 -print0)
+          (( ${#entries[@]} == 2 ))
+          ( cd "${download_dir}" && sha256sum -c wp-site-options.zip.sha256 )
+          [[ "$(sha256sum "${download_dir}/wp-site-options.zip" | awk '{ print $1 }')" == "${RELEASE_ZIP_SHA256}" ]]
+          scripts/validate-release-zip.sh "${download_dir}/wp-site-options.zip" "${RELEASE_VERSION}"
+
+      - name: Verify current remote source before WordPress.org deployment
+        shell: bash
+        env:
+          EVENT_SHA: ${{ github.sha }}
+          PUBLIC_REPOSITORY: ${{ github.repository }}
+        run: |
+          set -Eeuo pipefail
+          scripts/verify-release-ref.sh \
+            --tag "${RELEASE_TAG}" \
+            --expected-commit "${EVENT_SHA}" \
+            --repository "${PUBLIC_REPOSITORY}" \
+            --check-master
+
+      - name: Deploy verified production candidate to WordPress.org
+        shell: bash
+        env:
+          WPORG_USERNAME: ${{ vars.WPORG_USERNAME }}
+          WPORG_PASSWORD: ${{ secrets.WPORG_PASSWORD }}
+        run: |
+          set -Eeuo pipefail
+          [[ -n "${WPORG_USERNAME}" ]] || { printf 'WPORG_USERNAME is not configured.\n' >&2; exit 1; }
+          [[ -n "${WPORG_PASSWORD}" ]] || { printf 'WPORG_PASSWORD is not configured.\n' >&2; exit 1; }
+          scripts/deploy-wordpress-svn.sh \
+            --zip "${RUNNER_TEMP}/wordpress-org-download/wp-site-options.zip" \
+            --version "${RELEASE_VERSION}"

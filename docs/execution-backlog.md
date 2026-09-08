@@ -1012,7 +1012,7 @@ Verification:
 
 ### T22. Реализовать release workflow и нормализацию tags
 
-Status: todo
+Status: completed
 Goal: Автоматически создавать GitHub Release и запускать production SVN deploy для обоих утверждённых tag formats.  
 Scope:
 
@@ -1064,7 +1064,7 @@ Verification:
 
 ### T23. Проверить Actions configuration и выполнить real SVN dry-run
 
-Status: waiting_dependency  
+Status: todo
 Goal: Подтвердить availability правильных GitHub contexts и реальный WordPress.org delta без commit.  
 Scope:
 

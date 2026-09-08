@@ -187,6 +187,20 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
 
+  release-contracts:
+    name: Release contracts
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Run release tag and SVN deployment contracts
+        run: make test-release-contracts
+
   release-candidate:
     name: Release candidate
     if: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false }}
@@ -195,6 +209,7 @@ jobs:
       - wordpress-integration
       - plugin-check
       - admin-browser-smoke
+      - release-contracts
     runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
