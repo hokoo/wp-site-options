@@ -299,6 +299,13 @@ jobs:
           ref: ${{ github.sha }}
           persist-credentials: false
 
+      - name: Install Subversion
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y subversion
+
       - name: Run release tag and SVN deployment contracts
         run: make test-release-contracts
 
@@ -529,6 +536,13 @@ jobs:
             --expected-commit "${EVENT_SHA}" \
             --repository "${PUBLIC_REPOSITORY}" \
             --check-master
+
+      - name: Install Subversion
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          sudo apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y subversion
 
       - name: Deploy verified production candidate to WordPress.org
         shell: bash

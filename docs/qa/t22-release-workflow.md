@@ -82,6 +82,17 @@ both passed the strict validator, and the resulting inner ZIP SHA-256 was
 
 ## Remaining hosted evidence
 
+Hosted run
+[`34286435530`](https://github.com/hokoo/wp-site-options/actions/runs/34286435530)
+provided the first environment-specific result: `Release contracts` failed
+because the `ubuntu-24.04` image did not provide the `svn` executable, so the
+candidate correctly remained skipped. The workflow now installs `subversion`
+noninteractively, with `--no-install-recommends`, immediately before release
+fixtures in both CI and tag-release workflows. The production WordPress.org job
+does the same after source/artifact verification and before its credentialed
+deploy step. No unrelated job installs Subversion. Local actionlint confirms
+the corrected workflow structure; a hosted post-fix run remains required.
+
 A real accepted tag push is deliberately not part of local verification because
 it would create external state. The first hosted run must confirm:
 

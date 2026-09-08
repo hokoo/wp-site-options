@@ -49,7 +49,8 @@ The tagged commit repeats these gates on `ubuntu-24.04`:
 - zero-error Plugin Check;
 - the authenticated admin Playwright smoke;
 - `make test-release-contracts`, covering the tag parser and isolated SVN
-  deployment fixtures.
+  deployment fixtures. This job first installs Debian's `subversion` package
+  noninteractively because it is not guaranteed on `ubuntu-24.04`.
 
 The candidate job needs every gate. It derives the UTC ZIP epoch from the tag
 commit, rounds it down to ZIP's two-second granularity, builds twice with the
@@ -110,7 +111,9 @@ it atomically refetches both the exact lightweight/annotated tag and current
 remote `master` into dedicated temporary refs. The tag must remain at the
 original event commit and that commit must remain an ancestor of `master`. A
 deleted/moved tag or rewritten branch therefore fails before WordPress.org
-credentials enter any step context.
+credentials enter any step context. Only after that check, the job installs the
+runner's `subversion` package noninteractively and without recommended packages;
+the credentials are still scoped solely to the following deploy step.
 
 Configure the protected GitHub environment `wordpress-org` with:
 
