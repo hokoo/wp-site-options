@@ -6,9 +6,14 @@ The canonical installable plugin source lives in [`plugin-dir/`](./plugin-dir/).
 
 ## Delivery status
 
-The repository is being initialized from the current WordPress.org SVN trunk. The approved delivery plan and execution backlog are available in [`docs/`](./docs/).
+GitHub `master` is the canonical development source. The repository includes a
+Docker local environment, automated compatibility and browser tests,
+reproducible release archives, and tag-driven GitHub/WordPress.org deployment.
+The first automated production release remains subject to explicit maintainer
+approval.
 
-Local development, automated tests, reproducible release archives, and tag-driven WordPress.org deployment will be added through the tracked delivery backlog.
+See [local development](docs/development.md), the [release runbook](docs/release.md),
+and the [execution backlog](docs/execution-backlog.md).
 
 ## Public API
 

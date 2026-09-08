@@ -1160,7 +1160,7 @@ Verification:
 
 ### T25. Оформить release/recovery runbook и protections
 
-Status: todo
+Status: in_progress
 Goal: Сделать `master` и tag-driven production процесс управляемыми до первого реального deploy.  
 Scope:
 
