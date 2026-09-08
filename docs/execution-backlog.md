@@ -645,7 +645,7 @@ Verification:
 
 ### T14. Реализовать CI workflow для master и pull requests
 
-Status: in_progress
+Status: completed
 Goal: Сделать обязательные quality gates автоматическими и воспроизводимыми на GitHub Actions.  
 Scope:
 
@@ -693,7 +693,7 @@ Verification:
 
 ### T15. Провести независимый QA эпика E3
 
-Status: waiting_dependency  
+Status: in_progress
 Goal: Проверить, что tests и CI доказывают contracts, а не только подтверждают текущую реализацию.  
 Scope:
 
