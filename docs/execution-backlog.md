@@ -265,7 +265,7 @@ Verification:
 
 ### T6. Реализовать local-dev bootstrap, домен и симлинк
 
-Status: in_progress  
+Status: completed
 Goal: Автоматически установить WordPress на `wp-site-options.local` и подключить канонический `plugin-dir/` через симлинк.  
 Scope:
 

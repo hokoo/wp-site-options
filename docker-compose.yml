@@ -55,6 +55,11 @@ services:
         condition: service_healthy
       wordpress:
         condition: service_healthy
+    environment:
+      WORDPRESS_DB_HOST: db:3306
+      WORDPRESS_DB_NAME: "${DB_NAME:?Set DB_NAME in .env}"
+      WORDPRESS_DB_USER: "${DB_USER:?Set DB_USER in .env}"
+      WORDPRESS_DB_PASSWORD: "${DB_PASSWORD:?Set DB_PASSWORD in .env}"
     entrypoint: ["/bin/sh", "-c"]
     command:
       - |
