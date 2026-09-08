@@ -875,7 +875,7 @@ Verification:
 
 ### T19. Провести независимый QA эпика E4
 
-Status: in_progress
+Status: blocked
 Goal: Независимо проверить installability, hygiene и reproducibility release artifact.  
 Scope:
 
@@ -909,6 +909,9 @@ Dependencies:
 Notes/Risks:
 
 - QA проверяет artifact, не рабочую директорию.
+- Blocked: anonymous Actions artifact download returns HTTP 401; resume requires
+  read-only GitHub Actions access for `hokoo/wp-site-options` and the exact
+  commands recorded in `docs/qa/e4-qa.md`.
 
 Verification:
 
