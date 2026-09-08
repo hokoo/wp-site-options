@@ -1,0 +1,2 @@
+plugin-dir/** -text
+.wordpress-org/** -text
