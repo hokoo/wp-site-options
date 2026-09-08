@@ -265,7 +265,7 @@ Verification:
 
 ### T6. Реализовать local-dev bootstrap, домен и симлинк
 
-Status: waiting_dependency  
+Status: in_progress  
 Goal: Автоматически установить WordPress на `wp-site-options.local` и подключить канонический `plugin-dir/` через симлинк.  
 Scope:
 
@@ -451,7 +451,7 @@ Verification:
 
 ### T10. Добавить characterization tests публичного API
 
-Status: waiting_dependency  
+Status: completed  
 Goal: Защитить legacy public contracts до compatibility remediation.  
 Scope:
 
