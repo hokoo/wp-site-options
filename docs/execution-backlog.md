@@ -1,6 +1,6 @@
 # Execution backlog: WP Site Options delivery
 
-Статус документа: выполнение в процессе; E1-E5 завершены.
+Статус документа: E1-E5 и T25 завершены; T26 ожидает production approval.
 Источник: [delivery-plan.md](./delivery-plan.md)  
 Дата: 2026-09-08
 
@@ -1160,7 +1160,7 @@ Verification:
 
 ### T25. Оформить release/recovery runbook и protections
 
-Status: in_progress
+Status: completed
 Goal: Сделать `master` и tag-driven production процесс управляемыми до первого реального deploy.  
 Scope:
 
@@ -1209,7 +1209,7 @@ Verification:
 
 ### T26. Выпустить первую автоматизированную версию 1.2.2
 
-Status: waiting_dependency  
+Status: waiting_approval
 Goal: Провести controlled end-to-end GitHub и WordPress.org publication из проверенного commit.  
 Scope:
 
