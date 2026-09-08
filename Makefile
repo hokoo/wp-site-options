@@ -3,7 +3,7 @@ COMPOSER_BIN ?= composer
 
 .DEFAULT_GOAL := help
 
-.PHONY: help setup up down reset logs shell test lint test-e2e
+.PHONY: help setup up down reset logs shell test lint test-e2e release-zip test-release
 
 help:
 	@printf '%s\n' \
@@ -15,7 +15,9 @@ help:
 		'make shell  - open a WP-CLI container shell' \
 		'make lint   - run PHP syntax checks' \
 		'make test   - run unit tests' \
-		'make test-e2e - run the authenticated admin browser smoke'
+		'make test-e2e - run the authenticated admin browser smoke' \
+		'make release-zip - build and validate the deterministic plugin ZIP' \
+		'make test-release - run release reproducibility and negative tests'
 
 setup:
 	./scripts/setup-local.sh
@@ -47,3 +49,9 @@ test-e2e:
 
 lint:
 	$(COMPOSER_BIN) lint:php
+
+release-zip:
+	./scripts/build-release-zip.sh
+
+test-release:
+	./scripts/test-release-artifact.sh

@@ -786,7 +786,7 @@ Verification:
 
 ### T17. Добавить negative и reproducibility tests
 
-Status: in_progress
+Status: completed
 Goal: Доказать ZIP hygiene и byte-for-byte reproducibility.  
 Scope:
 
@@ -832,7 +832,7 @@ Verification:
 
 ### T18. Подключить verified ZIP artifact к CI
 
-Status: waiting_dependency  
+Status: in_progress
 Goal: Создавать в CI ровно тот кандидат, который впоследствии используется release workflow.  
 Scope:
 

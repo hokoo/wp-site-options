@@ -79,6 +79,20 @@ Both scripts clean temporary staging/extraction directories on success or failur
 
 ## Reproducibility check
 
+Run the automated reproducibility and negative-fixture suite:
+
+```bash
+make test-release
+```
+
+The suite builds twice with an explicit fixed `SOURCE_DATE_EPOCH`, compares both
+archives byte-for-byte and by SHA-256, validates the good archive, then proves
+that malicious path, metadata, manifest, byte-content, and version fixtures are
+rejected with their expected diagnostics. Fixtures exist only in a scoped
+temporary directory and are removed when the suite exits.
+
+For a manual comparison:
+
 ```bash
 scripts/build-release-zip.sh /tmp/wp-site-options-a.zip
 scripts/build-release-zip.sh /tmp/wp-site-options-b.zip
