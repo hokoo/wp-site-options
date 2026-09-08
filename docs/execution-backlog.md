@@ -1328,4 +1328,5 @@ Write scope Batch 1:
 - scoped commit в `master`;
 - readiness sweep T2.
 
-Для начала Batch 1 требуется отдельное одобрение владельца.
+Batch 1 был отдельно одобрен владельцем и завершён; раздел сохранён как запись
+исходной execution strategy.
