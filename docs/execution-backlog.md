@@ -918,7 +918,7 @@ Verification:
 
 ### T20. Реализовать безопасный WordPress.org SVN deploy script
 
-Status: in_progress
+Status: completed
 Goal: Синхронизировать один verified unpacked ZIP в SVN `trunk/assets/tags` с идемпотентностью и защитой существующих tags.  
 Scope:
 
@@ -969,7 +969,7 @@ Verification:
 
 ### T21. Добавить fixture tests SVN deploy
 
-Status: waiting_dependency  
+Status: todo
 Goal: Автоматически доказать корректность happy path, rerun и unsafe-state safeguards без доступа к WordPress.org.  
 Scope:
 
