@@ -316,7 +316,7 @@ Verification:
 
 ### T7. Добавить Make-команды и development guide
 
-Status: in_progress
+Status: completed
 Goal: Дать разработчику стабильный command interface для setup, работы, тестов, логов и безопасного reset.  
 Scope:
 
