@@ -404,7 +404,7 @@ Verification:
 
 ### T9. Создать Composer test/tooling harness
 
-Status: in_progress  
+Status: completed  
 Goal: Зафиксировать воспроизводимые dev dependencies и команды PHP lint/unit/integration/coding checks.  
 Scope:
 

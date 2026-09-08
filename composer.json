@@ -1,0 +1,36 @@
+{
+    "name": "hokoo/wp-site-options",
+    "description": "Development and test tooling for the WP Site Options plugin.",
+    "type": "project",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": ">=7.4"
+    },
+    "require-dev": {
+        "brain/monkey": "^2.6",
+        "phpunit/phpunit": "^9.6"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Hokoo\\WpSiteOptions\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "check": [
+            "@lint:php",
+            "@test"
+        ],
+        "lint:php": "bash scripts/lint-php.sh",
+        "test": "@test:unit",
+        "test:unit": "@php vendor/bin/phpunit --configuration phpunit.xml.dist --testsuite unit"
+    },
+    "config": {
+        "allow-plugins": false,
+        "platform": {
+            "php": "7.4.33"
+        },
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
