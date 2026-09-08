@@ -218,9 +218,10 @@ Never delete or retarget a published Git tag as a rollback. Never overwrite an
 SVN tag. A Git revert can repair `master`, but it cannot undo a GitHub Release or
 WordPress.org publication; production correction always uses a new version.
 
-## First automated release boundary
+## First automated release
 
-The first automated stable release is `1.2.2`. Its tag push, GitHub Release,
-and WordPress.org commit remain intentionally blocked until T26 receives
-explicit human production approval. All commands before “Create the release”
-are non-publishing preparation or verification steps.
+The first automated stable release, `v1.2.2`, was explicitly approved and
+published on 2026-09-09. Its immutable source/artifact/SVN evidence is recorded
+in [T26 production release evidence](qa/t26-release-1.2.2.md). Future releases
+must repeat this runbook with a new version and explicit production approval;
+approval of `1.2.2` does not authorize another release.
