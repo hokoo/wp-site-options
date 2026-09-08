@@ -170,7 +170,7 @@ Verification:
 
 ### T4. Провести независимый QA эпика E1
 
-Status: waiting_dependency  
+Status: completed  
 Goal: Независимо подтвердить точность импорта, provenance и отсутствие непреднамеренного изменения публичного контракта.  
 Scope:
 
