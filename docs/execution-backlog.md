@@ -591,12 +591,14 @@ Verification:
 
 ### T13. Исправить release-blocking compatibility/security findings
 
-Status: waiting_dependency  
+Status: in_progress
 Goal: Устранить только доказанные блокеры утверждённой матрицы и Plugin Check без изменения публичного API.  
 Scope:
 
 - PHP warnings/fatals в поддерживаемой матрице;
+- browser-visible output-buffer notice из T12;
 - sanitization/escaping/nonce/capability findings, признанные blocking;
+- 41 Plugin Check errors, классифицированные в `docs/qa/t11-integration.md`;
 - финальное подтверждённое `Tested up to` и фактическое дополнение changelog;
 - regression tests на каждое исправление;
 - минимальный production diff.
@@ -609,7 +611,7 @@ Out of Scope:
 
 DoR:
 
-- T10-T12 дали воспроизводимые findings;
+- T10-T11 и committed T12 harness/evidence дали воспроизводимые findings;
 - Plugin Check report классифицирован;
 - исправление не требует изменения утверждённого public contract; иначе нужен новый human decision gate.
 
@@ -626,12 +628,13 @@ AC:
 
 Dependencies:
 
-- T10, T11, T12;
+- T10, T11 и T12 harness/evidence; окончательный T12 pass входит в DoD этой remediation.
 - initial Plugin Check evidence.
 
 Notes/Risks:
 
 - Scope задачи уточняется по фактическим findings; API-breaking fix останавливает execution на human gate.
+- Sanitization сохраняет documented valid value shapes; unknown/custom fields остаются pass-through, чтобы не ломать extension contract.
 
 Verification:
 
