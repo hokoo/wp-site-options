@@ -362,7 +362,7 @@ Verification:
 
 ### T8. Провести независимый QA эпика E2
 
-Status: waiting_dependency  
+Status: completed
 Goal: Независимо подтвердить clean setup, идемпотентность, домен и корректность local-dev symlink.  
 Scope:
 
