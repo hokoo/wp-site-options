@@ -969,7 +969,7 @@ Verification:
 
 ### T21. Добавить fixture tests SVN deploy
 
-Status: todo
+Status: completed
 Goal: Автоматически доказать корректность happy path, rerun и unsafe-state safeguards без доступа к WordPress.org.  
 Scope:
 
@@ -1012,7 +1012,7 @@ Verification:
 
 ### T22. Реализовать release workflow и нормализацию tags
 
-Status: waiting_dependency  
+Status: todo
 Goal: Автоматически создавать GitHub Release и запускать production SVN deploy для обоих утверждённых tag formats.  
 Scope:
 

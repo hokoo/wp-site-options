@@ -3,7 +3,7 @@ COMPOSER_BIN ?= composer
 
 .DEFAULT_GOAL := help
 
-.PHONY: help setup up down reset logs shell test lint test-e2e release-zip test-release
+.PHONY: help setup up down reset logs shell test lint test-e2e release-zip test-release test-svn
 
 help:
 	@printf '%s\n' \
@@ -17,7 +17,8 @@ help:
 		'make test   - run unit tests' \
 		'make test-e2e - run the authenticated admin browser smoke' \
 		'make release-zip - build and validate the deterministic plugin ZIP' \
-		'make test-release - run release reproducibility and negative tests'
+		'make test-release - run release reproducibility and negative tests' \
+		'make test-svn - run isolated local SVN deployment fixtures'
 
 setup:
 	./scripts/setup-local.sh
@@ -55,3 +56,6 @@ release-zip:
 
 test-release:
 	./scripts/test-release-artifact.sh
+
+test-svn:
+	./scripts/test-svn-deploy.sh

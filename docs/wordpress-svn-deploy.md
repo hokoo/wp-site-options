@@ -160,3 +160,18 @@ The script does not update or mix newer remote content into post-commit
 evidence.
 There is no force-tag replacement, no reusable checkout, no credential cache,
 and no cleanup outside the one `mktemp` directory created by the process.
+
+## Local fixture suite
+
+Run the complete deploy contract against disposable local repositories:
+
+```bash
+make test-svn
+```
+
+The suite uses only `svnadmin` repositories addressed through `file:///` URLs.
+It performs no WordPress.org read or write, runs without WPORG credentials, and
+removes its exact `mktemp` tree on exit. It covers the empty dry run, first
+atomic deploy, exact tree/byte/property state, credential-free no-op, stale
+add/remove reconciliation, property-only normalization, immutable-tag and
+unsafe-state failures, and a deterministic repository-freshness race.
