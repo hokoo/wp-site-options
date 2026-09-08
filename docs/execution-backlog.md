@@ -737,7 +737,7 @@ Verification:
 
 ### T16. Реализовать build и strict ZIP validator
 
-Status: in_progress
+Status: completed
 Goal: Собирать installable ZIP из `plugin-dir/` и отвергать unsafe/несогласованный артефакт.  
 Scope:
 
@@ -786,7 +786,7 @@ Verification:
 
 ### T17. Добавить negative и reproducibility tests
 
-Status: waiting_dependency  
+Status: in_progress
 Goal: Доказать ZIP hygiene и byte-for-byte reproducibility.  
 Scope:
 
