@@ -9,8 +9,9 @@ The canonical installable plugin source lives in [`plugin-dir/`](./plugin-dir/).
 GitHub `master` is the canonical development source. The repository includes a
 Docker local environment, automated compatibility and browser tests,
 reproducible release archives, and tag-driven GitHub/WordPress.org deployment.
-The first automated production release remains subject to explicit maintainer
-approval.
+Automated release `1.2.2` is available from
+[GitHub](https://github.com/hokoo/wp-site-options/releases/tag/v1.2.2) and the
+[WordPress.org Plugin Directory](https://wordpress.org/plugins/wp-site-options/).
 
 See [local development](docs/development.md), the [release runbook](docs/release.md),
 and the [execution backlog](docs/execution-backlog.md).
