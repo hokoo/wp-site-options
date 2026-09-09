@@ -21,7 +21,7 @@ set +a
 readonly project_name="${COMPOSE_PROJECT_NAME:-wp-site-options}"
 
 if [[ "${1:-}" != "--yes" ]]; then
-	printf 'This removes the %s Compose containers, network, named database volume, and local-dev files.\n' "${project_name}"
+	printf 'This removes the %s Compose containers, network, named MySQL/PHP-log volumes, and local-dev files.\n' "${project_name}"
 	if [[ ! -t 0 ]]; then
 		printf 'Run again with --yes to confirm this project-scoped reset.\n' >&2
 		exit 1
@@ -34,10 +34,10 @@ if [[ "${1:-}" != "--yes" ]]; then
 fi
 
 if [[ -d "${PROJECT_ROOT}/local-dev" ]]; then
-	# WordPress image files are owned by the container user. Remove only the
-	# contents of this repository's ignored local-dev bind mount.
-	docker compose run --rm --no-deps --user root --entrypoint sh wordpress \
-		-c 'find /srv/web/local-dev -mindepth 1 -delete'
+	# Remove only the generated WordPress document root. /workspace is a
+	# separate mount and is never touched by this command.
+	docker compose run --rm --no-deps --user root --entrypoint sh php \
+		-c 'find /srv/web -mindepth 1 -delete'
 fi
 
 docker compose down --volumes --remove-orphans

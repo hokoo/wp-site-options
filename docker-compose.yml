@@ -1,42 +1,84 @@
 name: "${COMPOSE_PROJECT_NAME:-wp-site-options}"
 
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "${DOCKER_LOG_MAX_SIZE:-10m}"
+    max-file: "${DOCKER_LOG_MAX_FILE:-3}"
+
 services:
   db:
-    image: "${DB_IMAGE:-mariadb:10.11}"
+    image: "${MYSQL_IMAGE:-mysql:8.0.46}"
     init: true
     restart: unless-stopped
     stop_grace_period: 30s
     environment:
-      MARIADB_DATABASE: "${DB_NAME:?Set DB_NAME in .env}"
-      MARIADB_USER: "${DB_USER:?Set DB_USER in .env}"
-      MARIADB_PASSWORD: "${DB_PASSWORD:?Set DB_PASSWORD in .env}"
-      MARIADB_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env}"
+      MYSQL_DATABASE: "${DB_NAME:?Set DB_NAME in .env}"
+      MYSQL_USER: "${DB_USER:?Set DB_USER in .env}"
+      MYSQL_PASSWORD: "${DB_PASSWORD:?Set DB_PASSWORD in .env}"
+      MYSQL_ROOT_PASSWORD: "${DB_ROOT_PASSWORD:?Set DB_ROOT_PASSWORD in .env}"
     healthcheck:
-      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      test: 'MYSQL_PWD="$${MYSQL_ROOT_PASSWORD}" mysqladmin ping --host=127.0.0.1 --user=root --silent'
       interval: 5s
       timeout: 5s
       retries: 20
-      start_period: 10s
+      start_period: 15s
     volumes:
-      - db-data:/var/lib/mysql
+      - mysql-data:/var/lib/mysql
+    logging: *default-logging
 
-  wordpress:
-    image: "${WORDPRESS_IMAGE:-wordpress:php8.3-apache}"
+  php:
+    build:
+      context: ./docker/php
+      args:
+        PHP_BASE_IMAGE: "${PHP_BASE_IMAGE:-wodby/wordpress-php:8.4-4.80.9}"
     init: true
     restart: unless-stopped
+    working_dir: /srv/web
     depends_on:
       db:
         condition: service_healthy
     environment:
+      APP_ROOT: /srv/web
+      DB_HOST: db
+      DB_PORT: 3306
+      DB_NAME: "${DB_NAME:?Set DB_NAME in .env}"
+      DB_USER: "${DB_USER:?Set DB_USER in .env}"
+      DB_PASSWORD: "${DB_PASSWORD:?Set DB_PASSWORD in .env}"
       WORDPRESS_DB_HOST: db:3306
       WORDPRESS_DB_NAME: "${DB_NAME:?Set DB_NAME in .env}"
       WORDPRESS_DB_USER: "${DB_USER:?Set DB_USER in .env}"
       WORDPRESS_DB_PASSWORD: "${DB_PASSWORD:?Set DB_PASSWORD in .env}"
-      WORDPRESS_DEBUG: "${WP_DEBUG:-1}"
-    extra_hosts:
-      - "${WP_HOST:-wp-site-options.local}:host-gateway"
+      WP_DEBUG: "${WP_DEBUG:-1}"
+      PHP_FPM_USER: wodby
+      PHP_FPM_GROUP: wodby
+      PHP_FPM_CLEAR_ENV: "no"
+      PHP_EXTENSIONS_DISABLE: "${PHP_EXTENSIONS_DISABLE:-xdebug,xhprof,spx}"
     healthcheck:
-      test: ["CMD-SHELL", "php -r 'exit(@fsockopen(\"127.0.0.1\", 80) ? 0 : 1);'"]
+      test: "php -r 'exit(@fsockopen(\"127.0.0.1\", 9000) ? 0 : 1);'"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 20s
+    volumes:
+      - ./local-dev:/srv/web
+      - ./:/workspace
+      - php-logs:/var/log/php
+    logging: *default-logging
+
+  nginx:
+    image: "${NGINX_IMAGE:-nginx:1.31.5-alpine}"
+    init: true
+    restart: unless-stopped
+    working_dir: /srv/web
+    depends_on:
+      php:
+        condition: service_healthy
+    environment:
+      NGINX_ENVSUBST_FILTER: ^WP_HOST$
+      WP_HOST: "${WP_HOST:-wp-site-options.local}"
+    healthcheck:
+      test: 'wget --quiet --spider http://127.0.0.1/wp-login.php || exit 1'
       interval: 5s
       timeout: 5s
       retries: 20
@@ -44,39 +86,11 @@ services:
     ports:
       - "${WP_BIND_ADDRESS:-127.0.0.1}:${WP_HTTP_PORT:-8088}:80"
     volumes:
-      - ./:/srv/web
-      - ./local-dev:/var/www/html
-
-  wp-cli:
-    image: "${WP_CLI_IMAGE:-wordpress:cli-php8.3}"
-    init: true
-    depends_on:
-      db:
-        condition: service_healthy
-      wordpress:
-        condition: service_healthy
-    environment:
-      WORDPRESS_DB_HOST: db:3306
-      WORDPRESS_DB_NAME: "${DB_NAME:?Set DB_NAME in .env}"
-      WORDPRESS_DB_USER: "${DB_USER:?Set DB_USER in .env}"
-      WORDPRESS_DB_PASSWORD: "${DB_PASSWORD:?Set DB_PASSWORD in .env}"
-    entrypoint: ["/bin/sh", "-c"]
-    command:
-      - |
-        trap 'exit 0' TERM INT
-        while :; do sleep 3600; done
-    working_dir: /var/www/html
-    extra_hosts:
-      - "${WP_HOST:-wp-site-options.local}:host-gateway"
-    healthcheck:
-      test: ["CMD", "wp", "--info"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 5s
-    volumes:
-      - ./:/srv/web
-      - ./local-dev:/var/www/html
+      - ./local-dev:/srv/web:ro
+      - ./plugin-dir:/workspace/plugin-dir:ro
+      - ./docker/nginx/default.conf.template:/etc/nginx/templates/default.conf.template:ro
+    logging: *default-logging
 
 volumes:
-  db-data:
+  mysql-data:
+  php-logs:
