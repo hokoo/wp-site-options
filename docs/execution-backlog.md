@@ -216,14 +216,15 @@ Verification:
 ### T5. Создать базовый Docker Compose stack
 
 Status: completed  
-Goal: Поднять изолированные `db`, `wordpress` и `wp-cli` с configurable PHP image/project/ports и безопасным хранением данных.  
+Goal: Поднять изолированные `db`, `php` и `nginx` с configurable images/project/ports и безопасным хранением данных; WP-CLI выполняется в Wodby PHP-контейнере.
 Scope:
 
-- `docker-compose.yml`, `.env.example` и минимальные Docker configs;
-- named database volume;
+- `docker-compose.yml`, `.env.example`, nginx config и минимальные Docker configs;
+- named volumes для MySQL и PHP application logs;
 - health checks и service dependencies;
-- единый root mount, необходимый для local-dev symlink;
-- defaults для `wp-site-options.local`.
+- единый WordPress document root `/srv/web` и отдельный tooling mount `/workspace`;
+- defaults для `wp-site-options.local`;
+- отсутствие fixed container/network names и architecture pinning, чтобы несколько checkout работали параллельно на WSL2/Linux/macOS.
 
 Out of Scope:
 
@@ -273,12 +274,12 @@ Scope:
 - local-dev WordPress layout;
 - симлинк `local-dev/wp-content/plugins/wp-site-options` → `/srv/web/plugin-dir`;
 - core install, plugin activation и representative fixture fields;
-- понятная hosts-file инструкция/проверка.
+- идемпотентное управление hosts mapping для Linux/macOS и WSL2/Windows.
 
 Out of Scope:
 
 - копирование plugin source в local-dev;
-- изменение host hosts-file без участия пользователя;
+- изменение host hosts-file без sudo/UAC подтверждения пользователя;
 - destructive database reset по умолчанию.
 
 DoR:

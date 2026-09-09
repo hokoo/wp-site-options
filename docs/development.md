@@ -1,142 +1,163 @@
 # Local development
 
-The local stack runs an isolated MariaDB, WordPress with Apache, and WP-CLI. By default the site is available at `http://wp-site-options.local:8088`, and the repository is mounted inside the containers at `/srv/web`.
+The local stack has exactly three services: nginx, WordPress PHP-FPM, and MySQL 8. WP-CLI and Composer are included in the PHP image; there is no separate tools container. The default URL is `http://wp-site-options.local:8088`.
 
 ## Prerequisites
 
-- Docker Engine with Docker Compose v2 (`docker compose version`);
+- Docker Engine with Docker Compose v2, or Docker Desktop on macOS/Windows;
 - GNU Make;
-- PHP 7.4 or newer and Composer for the test and lint targets;
-- the PHP DOM, Filter, JSON, libxml, Mbstring, Tokenizer, and XMLWriter extensions required by PHPUnit;
-- an available local TCP port (the default is `8088`).
+- Node.js and npm only for the Playwright browser test;
+- an available local TCP port (the default is `8088`);
+- `sudo` access for the one-time hosts entry on Linux/macOS, or permission to accept a Windows UAC prompt from WSL2.
 
-For WSL2, enable Docker Desktop integration for the Linux distribution that contains the checkout. Keep the checkout in the WSL filesystem, for example `/home/<user>/reps/wp-site-options`, rather than under `/mnt/c` or `/mnt/d`. This gives Docker predictable Linux permissions and substantially better bind-mount performance.
+For WSL2, enable Docker Desktop integration for the distribution containing the checkout. Keep the checkout in the WSL filesystem, such as `/home/<user>/reps/wp-site-options`, rather than under `/mnt/c` or `/mnt/d`.
 
-On native Linux, ensure the current user can access the Docker daemon before setup. Docker commands should work without changing ownership of repository files.
+On native Linux, Docker commands must work for the current user. On macOS, enable Docker file sharing for the checkout when it is outside the default shared locations. The PHP, MySQL, and nginx images support both `amd64` and `arm64`; the stack does not force an architecture on Apple Silicon.
 
 ## First setup
 
-Add the local hostname to the hosts file:
-
-```text
-127.0.0.1 wp-site-options.local
-```
-
-- When the browser runs on Windows, edit `C:\Windows\System32\drivers\etc\hosts` from an elevated editor.
-- When the browser runs on Linux, edit `/etc/hosts` as root.
-
-Then run:
+Run from the host:
 
 ```bash
 make setup
 ```
 
-The setup command creates the ignored `.env` from `.env.example` when necessary, starts the Compose project, installs WordPress, activates WP Site Options, and connects the local fixture. It is safe to run again: existing database content is preserved, the site URL is reconciled with `.env`, and valid symlinks are reused.
+Setup creates the ignored `.env` when necessary, adds the local hostname, builds the PHP image, starts MySQL and PHP, downloads WordPress, creates or reconciles `wp-config.php`, activates the plugin and fixture, and finally starts nginx. It is idempotent: rerunning it preserves an installed database and updates the configured site URL.
 
-The default local credentials are development-only values from `.env.example`. Change them in `.env` when needed; never commit `.env`.
+On Linux and macOS, setup may request `sudo` for `/etc/hosts`. Under WSL2 it checks both WSL and Windows; accept the Windows UAC prompt so a browser running on Windows can resolve the domain.
 
-Open `http://wp-site-options.local:8088/wp-admin/` after setup. The setup output reports the exact URL if `WP_HTTP_PORT` has been changed.
+Open `http://wp-site-options.local:8088/wp-admin/`. The setup output reports the exact URL when the port or domain differs.
 
-## Commands
+## Host Make commands
+
+Make is always invoked on the host. Container-dependent targets first start and wait for their required services and then execute the command in the appropriate container.
 
 | Command | Purpose |
 | --- | --- |
-| `make help` | List the available development commands. |
-| `make setup` | Create/configure the complete local site idempotently. |
-| `make up` | Start the existing stack and wait for healthy services. |
-| `make down` | Stop containers while preserving the database volume and `local-dev/`. |
-| `make reset` | Interactively remove this Compose project's containers, network, database volume, and `local-dev/`. |
-| `make logs` | Follow the last 100 log lines from all services. |
-| `make shell` | Open a shell in the running WP-CLI container. |
-| `make lint` | Run the PHP syntax check through Composer. |
-| `make test` | Run the unit test suite through Composer. |
+| `make setup` | Build and reconcile the complete local site. |
+| `make up` | Start MySQL, PHP-FPM, and nginx. |
+| `make down` | Stop containers while preserving local data. |
+| `make reset` | Interactively remove this project's generated WordPress tree and active named volumes. |
+| `make ps` | Show this Compose project's services. |
+| `make php.build` | Pull the selected base and rebuild the PHP image. |
+| `make shell` | Open Bash in the PHP container at `/srv/web`. |
+| `make nginx-shell` | Open a shell in nginx. |
+| `make db-shell` | Open an authenticated MySQL client. |
+| `make wp ARGS="plugin list"` | Run WP-CLI inside PHP. |
+| `make composer.install` | Install Composer development dependencies inside PHP. |
+| `make lint` | Run PHP syntax checks inside PHP. |
+| `make test` | Run PHPUnit inside PHP. |
+| `make test-e2e` | Start the complete site, then run Playwright on the host. |
+| `make logs` | Follow timestamped Docker logs for all services. |
+| `make logs SERVICE=nginx` | Follow one service's Docker logs. |
+| `make php.log` | Follow the colorized PHP application log. |
+| `make php.log.clear` | Truncate PHP and Xdebug application logs inside PHP. |
+| `make hosts-check` | Verify native and, under WSL2, Windows hostname mappings. |
+| `make hosts-add` | Add missing project-marked hostname mappings. |
+| `make hosts-remove` | Remove only mappings managed for this project. |
 
-Install development dependencies before the quality commands:
+Install PHP test dependencies without requiring host PHP:
 
 ```bash
-composer install
+make composer.install
 make lint
 make test
 ```
 
-On Debian/Ubuntu, the additional PHPUnit extensions are commonly provided by the `php-xml` and `php-mbstring` packages matching the selected PHP version.
+## PHP application logs
 
-`make reset` is intentionally destructive and asks for the current `COMPOSE_PROJECT_NAME` before proceeding. For deliberate non-interactive cleanup, use `./scripts/reset-local.sh --yes`. Both forms read `.env` and operate only on that Compose project. The `.env` file itself is preserved.
+PHP writes errors to `/var/log/php/error.log` in the project-scoped `php-logs` named volume. The custom PHP image contains `grcat` and the PHP-specific color rules taken from the `wp-server` reference.
 
-## Project scope and persisted data
-
-`COMPOSE_PROJECT_NAME` in `.env` scopes container, network, and volume names. The database is stored in the named volume `<project>_db-data`; WordPress files are stored in the ignored `local-dev/` bind mount.
-
-A normal `make down` followed by `make up` preserves both stores. Only the explicit reset removes the database volume and generated WordPress files. If the project name must change, run the reset while `.env` still contains the old name; otherwise the old project's resources remain intentionally untouched.
-
-## Plugin and fixture symlinks
-
-The canonical plugin source is never copied into WordPress. Setup creates these links inside the shared container mounts:
-
-```text
-/var/www/html/wp-content/plugins/wp-site-options
-  -> /srv/web/plugin-dir
-
-/var/www/html/wp-content/mu-plugins/wp-site-options-fixture.php
-  -> /srv/web/tests/fixtures/wp-site-options-fixture.php
-```
-
-Therefore an edit under `plugin-dir/` is immediately visible to WordPress without sync or rebuild. The absolute `/srv/web/...` targets are container paths; the links are not expected to resolve when inspected directly from Windows.
-
-Verify the plugin link from the running stack with:
+Follow the last 50 lines and continue streaming:
 
 ```bash
-docker compose exec -T wp-cli readlink /var/www/html/wp-content/plugins/wp-site-options
-docker compose exec -T wp-cli wp plugin is-active wp-site-options
+make php.log
 ```
+
+The target starts MySQL and PHP first, then runs this pipeline inside PHP:
+
+```bash
+tail -n 50 -F /var/log/php/error.log | PYTHONUNBUFFERED=1 grcat /home/wodby/.grc/grc.php.log.conf
+```
+
+`display_errors`, startup errors, and `E_ALL` reporting are enabled for local development. Docker service logs use bounded `json-file` rotation (`10m` and three files by default). Change `DOCKER_LOG_MAX_SIZE` or `DOCKER_LOG_MAX_FILE` in `.env` if needed.
+
+## Paths and persisted data
+
+The only web document root in both nginx and PHP is `/srv/web`; `/var/www/html` is not used. The generated `local-dev/` directory is mounted there. The repository is separately mounted at `/workspace` so tests and Composer operate on canonical sources without making the repository itself web-accessible.
+
+Setup creates these links inside the generated WordPress tree:
+
+```text
+/srv/web/wp-content/plugins/wp-site-options
+  -> /workspace/plugin-dir
+
+/srv/web/wp-content/mu-plugins/wp-site-options-fixture.php
+  -> /workspace/tests/fixtures/wp-site-options-fixture.php
+```
+
+Edits under `plugin-dir/` are therefore visible immediately without copying or rebuilding.
+
+`COMPOSE_PROJECT_NAME` scopes all containers, networks, and named volumes. MySQL data lives in `<project>_mysql-data`, PHP application logs in `<project>_php-logs`, and WordPress files in the ignored `local-dev/` bind mount. `make down` preserves them; only the explicit reset removes the active volumes and generated WordPress files.
+
+The old MariaDB-based local stack used `<project>_db-data`. Upgrading does not delete that volume automatically, so its previous data remains recoverable until deliberately removed.
 
 ## Configuration
 
-The commonly changed `.env` values are:
+Common `.env` values are:
 
-- `COMPOSE_PROJECT_NAME` — isolation boundary for Docker resources;
-- `WP_HOST` — hostname without scheme or port;
-- `WP_BIND_ADDRESS` — host interface, `127.0.0.1` by default;
-- `WP_HTTP_PORT` — published HTTP port, `8088` by default;
-- `WORDPRESS_IMAGE` and `WP_CLI_IMAGE` — WordPress/PHP profile;
-- `DB_IMAGE` — database profile;
-- `WP_ADMIN_*` and `DB_*` — local-only credentials.
+- `COMPOSE_PROJECT_NAME` — resource isolation boundary;
+- `WP_HOST` — hostname without scheme, port, or path;
+- `WP_BIND_ADDRESS` — published interface, `127.0.0.1` by default;
+- `WP_HTTP_PORT` — published nginx port;
+- `PHP_BASE_IMAGE` — pinned Wodby WordPress PHP base;
+- `MYSQL_IMAGE` and `NGINX_IMAGE` — database and web-server images;
+- `WP_ADMIN_*` and `DB_*` — local-only credentials;
+- `PHP_EXTENSIONS_DISABLE` — optional Wodby extensions disabled at startup.
 
-After changing the hostname or port, run `make setup` so the WordPress `home` and `siteurl` values match the new URL. Changing `COMPOSE_PROJECT_NAME` selects a different isolated stack rather than renaming existing resources.
+Legacy `WORDPRESS_IMAGE`, `WP_CLI_IMAGE`, `PHP_IMAGE`, and `DB_IMAGE` variables are ignored. They can be removed from an existing `.env` after comparing it with `.env.example`.
+
+### Running several projects at once
+
+Give every checkout a distinct project name, domain, and HTTP port:
+
+```dotenv
+COMPOSE_PROJECT_NAME=wp-site-options-two
+WP_HOST=wp-site-options-two.local
+WP_HTTP_PORT=8089
+```
+
+Run `make setup` in that checkout. It can run beside `wp-site-options.local:8088`; MySQL is internal-only and publishes no host port.
+
+## MySQL TLS and WP-CLI
+
+MySQL 8 automatically provisions a self-signed TLS certificate. The MariaDB client bundled in current Wodby images keeps TLS but disables server-certificate verification for this local connection. WP-CLI 2.12 normally adds `--no-defaults`, so the PHP image supplies command defaults for every `wp db` operation that invokes a client binary. This makes commands such as `db check`, `db export`, and `db reset` consistently load Wodby's TLS client configuration. No local CA setup or per-command SSL flag is required.
 
 ## Troubleshooting
 
 ### The hostname does not open
 
-Confirm that the hosts entry is in the operating system where the browser runs. In WSL2 with a Windows browser, changing only WSL's `/etc/hosts` is not sufficient. The `.local` suffix can also be claimed by multicast DNS, so keep the explicit `127.0.0.1` mapping.
+Run `make hosts-check`, then `make hosts-add` if needed. Under WSL2 with a Windows browser, both WSL and Windows mappings must pass.
 
-Check the configured URL and service state:
+Check service state and the stored URL:
 
 ```bash
-docker compose exec -T wp-cli wp option get home
-docker compose ps
+make ps
+make wp ARGS="option get home"
 ```
 
 ### The HTTP port is already allocated
 
-Set another unused port in `.env`, for example:
+Set another port in `.env`, such as `WP_HTTP_PORT=18088`, and rerun `make setup`.
 
-```dotenv
-WP_HTTP_PORT=18088
-```
+### A service is unhealthy
 
-Run `make setup` again and use the URL printed by the script. Ports `80` and `443` are not required by this stack.
+Run `make ps` and `make logs`. PHP waits for healthy MySQL, while nginx waits for healthy PHP-FPM. Resolve the first failing dependency and rerun setup.
 
-### A service is unhealthy or setup stops
+### Setup refuses to replace a plugin path
 
-Inspect `docker compose ps` and run `make logs`. The WordPress and WP-CLI services wait for a healthy database, so a database error should be resolved before retrying `make setup`.
+Setup repairs symlinks but deliberately refuses to delete a real file or directory at `local-dev/wp-content/plugins/wp-site-options`. Move that path only after confirming it contains no work, then rerun `make setup`.
 
-### Docker reports permission denied
+### Reset behavior
 
-On WSL2, verify that Docker Desktop is running and integration is enabled for the current distribution. On Linux, ensure the user has permission to access the Docker daemon, then start a new login session after changing group membership.
-
-Do not recursively change ownership of the repository to work around container permissions. Generated WordPress files can be owned by the container user; `make reset` removes them from inside a container for that reason.
-
-### Setup refuses to replace the plugin path
-
-Setup only repairs absent or incorrect symlinks. It deliberately refuses to delete a real file or directory at `local-dev/wp-content/plugins/wp-site-options`. Move that path out of the way after confirming it contains no work, then rerun `make setup`.
+`make reset` asks for the current `COMPOSE_PROJECT_NAME`. For deliberate non-interactive cleanup, use `./scripts/reset-local.sh --yes`. Both forms preserve `.env` and operate only on the selected Compose project.
