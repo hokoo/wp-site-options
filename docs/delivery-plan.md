@@ -92,7 +92,7 @@ wp-site-options/
 - `.wordpress-org/` — источник только для WordPress.org assets и не входит в ZIP.
 - Composer используется для dev/test-инструментов; runtime `vendor/` не добавляется без реальной зависимости плагина.
 - Node не добавляется: у плагина нет frontend build pipeline. Playwright, если понадобится для admin smoke, запускается только как тестовый инструмент.
-- Docker Compose включает `db`, `wordpress` и `wp-cli`. Корень репозитория монтируется в контейнер, а setup создаёт симлинк `local-dev/wp-content/plugins/wp-site-options` на канонический `/srv/web/plugin-dir`; release source при этом не дублируется. Локальный домен — `wp-site-options.local`. Порт, project name и PHP image tag задаются через `.env`, данные БД живут в именованном Docker volume.
+- Docker Compose включает только `db` (MySQL 8), `php` (Wodby WordPress PHP 8.4 с WP-CLI) и `nginx`. WordPress имеет единый document root `/srv/web`, а checkout доступен инструментам в `/workspace`; setup создаёт симлинк на канонический `plugin-dir`, поэтому release source не дублируется. Локальный домен — `wp-site-options.local`; setup идемпотентно обеспечивает hosts mapping для Linux/macOS и WSL2/Windows. Порт, project name и image tags задаются через `.env`, данные БД и PHP-логи живут в project-scoped Docker volumes.
 - Основная ветка — `master`. Отдельная mirror-ветка с собранным плагином не создаётся: при отсутствии production build-зависимостей достаточно ZIP и WordPress.org SVN. Это уменьшает число источников истины.
 
 ## 6. Объём работ

@@ -19,6 +19,10 @@ if [[ ! -f "${ENV_FILE}" ]]; then
 	printf 'Created .env from .env.example.\n'
 fi
 
+if grep -Eq '^(WORDPRESS_IMAGE|WP_CLI_IMAGE|PHP_IMAGE|DB_IMAGE)=' "${ENV_FILE}"; then
+	printf 'Note: legacy image variables are ignored; use PHP_BASE_IMAGE and MYSQL_IMAGE (see .env.example).\n'
+fi
+
 set -a
 # shellcheck disable=SC1090
 source "${ENV_FILE}"
@@ -26,6 +30,7 @@ set +a
 
 : "${WP_HOST:=wp-site-options.local}"
 : "${WP_HTTP_PORT:=8088}"
+: "${WP_DEBUG:=1}"
 : "${WP_TITLE:=WP Site Options Local}"
 : "${WP_ADMIN_USER:=admin}"
 : "${WP_ADMIN_PASSWORD:?Set WP_ADMIN_PASSWORD in .env}"
@@ -47,10 +52,56 @@ if [[ "${WP_HTTP_PORT}" != "80" ]]; then
 fi
 readonly wp_url
 
-printf 'Starting the %s Docker Compose stack...\n' "${COMPOSE_PROJECT_NAME:-wp-site-options}"
-docker compose up -d --wait
+mkdir -p "${PROJECT_ROOT}/local-dev"
 
-docker compose exec -T --user root wp-cli sh -eu -c '
+printf 'Building and starting db + PHP for %s...\n' "${COMPOSE_PROJECT_NAME:-wp-site-options}"
+docker compose up -d --build --wait --remove-orphans db php
+
+# The generated WordPress tree is the only document root. The project checkout
+# is mounted separately at /workspace so plugin source remains canonical.
+docker compose exec -T --user root php sh -eu -c '
+	chown -R wodby:wodby /srv/web
+	install -d -o wodby -g wodby /srv/web/wp-content
+'
+
+docker compose exec -T php sh -eu -c '
+	cd /srv/web
+
+	if [ ! -f wp-load.php ]; then
+		printf "Downloading WordPress core into /srv/web...\n"
+		wp core download --force
+	fi
+
+	if [ ! -f wp-config.php ]; then
+		printf "Creating wp-config.php...\n"
+		wp config create \
+			--dbname="${DB_NAME}" \
+			--dbuser="${DB_USER}" \
+			--dbpass="${DB_PASSWORD}" \
+			--dbhost="${DB_HOST}:${DB_PORT}" \
+			--dbcharset=utf8mb4 \
+			--skip-check
+	fi
+
+	wp config set DB_NAME "${DB_NAME}" --type=constant --quiet
+	wp config set DB_USER "${DB_USER}" --type=constant --quiet
+	wp config set DB_PASSWORD "${DB_PASSWORD}" --type=constant --quiet
+	wp config set DB_HOST "${DB_HOST}:${DB_PORT}" --type=constant --quiet
+
+	case "${WP_DEBUG}" in
+		1|true|TRUE|yes|YES|on|ON)
+			wp config set WP_DEBUG true --raw --type=constant --quiet
+			wp config set WP_DEBUG_LOG /var/log/php/error.log --type=constant --quiet
+			wp config set WP_DEBUG_DISPLAY true --raw --type=constant --quiet
+			;;
+		*)
+			wp config set WP_DEBUG false --raw --type=constant --quiet
+			wp config set WP_DEBUG_DISPLAY false --raw --type=constant --quiet
+			;;
+	esac
+'
+
+docker compose exec -T --user root php sh -eu -c '
 	ensure_link() {
 		link_path="$1"
 		target_path="$2"
@@ -68,15 +119,16 @@ docker compose exec -T --user root wp-cli sh -eu -c '
 		fi
 
 		ln -s "${target_path}" "${link_path}"
+		chown -h wodby:wodby "${link_path}"
 	}
 
-	ensure_link /var/www/html/wp-content/plugins/wp-site-options /srv/web/plugin-dir
-	ensure_link /var/www/html/wp-content/mu-plugins/wp-site-options-fixture.php /srv/web/tests/fixtures/wp-site-options-fixture.php
+	ensure_link /srv/web/wp-content/plugins/wp-site-options /workspace/plugin-dir
+	ensure_link /srv/web/wp-content/mu-plugins/wp-site-options-fixture.php /workspace/tests/fixtures/wp-site-options-fixture.php
 '
 
-if ! docker compose exec -T wp-cli wp core is-installed >/dev/null 2>&1; then
+if ! docker compose exec -T php wp core is-installed >/dev/null 2>&1; then
 	printf 'Installing WordPress at %s...\n' "${wp_url}"
-	docker compose exec -T wp-cli wp core install \
+	docker compose exec -T php wp core install \
 		--url="${wp_url}" \
 		--title="${WP_TITLE}" \
 		--admin_user="${WP_ADMIN_USER}" \
@@ -85,15 +137,15 @@ if ! docker compose exec -T wp-cli wp core is-installed >/dev/null 2>&1; then
 		--skip-email
 else
 	printf 'WordPress is already installed; preserving its content.\n'
-	docker compose exec -T wp-cli wp option update home "${wp_url}" --quiet
-	docker compose exec -T wp-cli wp option update siteurl "${wp_url}" --quiet
+	docker compose exec -T php wp option update home "${wp_url}" --quiet
+	docker compose exec -T php wp option update siteurl "${wp_url}" --quiet
 fi
 
-if ! docker compose exec -T wp-cli wp plugin is-active wp-site-options >/dev/null 2>&1; then
-	docker compose exec -T wp-cli wp plugin activate wp-site-options
+if ! docker compose exec -T php wp plugin is-active wp-site-options >/dev/null 2>&1; then
+	docker compose exec -T php wp plugin activate wp-site-options
 fi
 
-docker compose exec -T wp-cli wp eval '
+docker compose exec -T php wp eval '
 	global $wpto;
 	if ( ! isset( $wpto->fields["local_fixture"][1]["headline"] ) ) {
 		fwrite( STDERR, "Local fixture fields were not registered.\n" );
@@ -101,14 +153,11 @@ docker compose exec -T wp-cli wp eval '
 	}
 '
 
-if command -v getent >/dev/null 2>&1 \
-	&& getent ahostsv4 "${WP_HOST}" 2>/dev/null \
-		| awk '$1 == "127.0.0.1" { found = 1 } END { exit !found }'; then
-	printf 'Host %s resolves to 127.0.0.1.\n' "${WP_HOST}"
-else
-	printf '\nHost mapping not detected. Add this entry before opening the site:\n'
-	printf '  127.0.0.1 %s\n' "${WP_HOST}"
-	printf 'Use /etc/hosts for a Linux browser, or C:\\Windows\\System32\\drivers\\etc\\hosts for a Windows browser.\n'
+printf 'Starting nginx...\n'
+docker compose up -d --wait --remove-orphans nginx
+
+if ! "${SCRIPT_DIR}/local-domain.sh" check; then
+	printf '\nLocal-domain mapping is incomplete. Run `make hosts-add`, then retry.\n' >&2
 fi
 
 printf '\nWordPress is ready: %s\n' "${wp_url}"
